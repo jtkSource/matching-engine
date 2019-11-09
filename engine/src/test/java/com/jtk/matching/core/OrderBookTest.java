@@ -227,7 +227,7 @@ public class OrderBookTest {
 
 
     @Test
-    public void add_matching_bid_to_order_book_should_result_in_removing_top_level_on_ask_add_remaining_to_bid_levels(){
+    public void add_matching_bid_to_order_book_should_result_in_removing_top_level_on_ask_and_add_remaining_to_bid_levels(){
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createOrderBook(productId, pricetype);
@@ -250,7 +250,6 @@ public class OrderBookTest {
         Assert.assertEquals("ask top level should be 3",3,book.getAsks().size());
 
         Assert.assertEquals("best bid Quantity should be 500",500,book.getBids().getFirst().getQuantity());
-
     }
 
 
