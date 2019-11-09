@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.Iterator;
@@ -28,7 +29,6 @@ public class OrderBookTest {
         Assert.assertEquals("OrderBook should have productId", book.getProductId(), productId);
         Assert.assertEquals("OrderBook should have priceType", book.getPriceType(), cash);
     }
-
 
     @Test
     public void add_three_bid_order_to_order_book_should_create_a_list_of_three_bids() {
@@ -53,7 +53,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_four_buy_order_to_order_book_should_sort_from_hi_to_low_price_and_long_to_short_time() {
+    public void add_to_order_book_should_sort_bid_from_hi_to_low_price_and_ask_from_low_to_hi_and_long_to_short_time() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createOrderBook(productId, pricetype);
@@ -61,6 +61,11 @@ public class OrderBookTest {
         book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
         book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
         book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+
+        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
 
         LOGGER.info("Bid Orders {}", book.getBids().makeString("\n"));
         Assert.assertTrue("There should be three buy orders",book.getBids().size() == 4);
@@ -80,22 +85,11 @@ public class OrderBookTest {
                 prev = oe;
             }
         }
-    }
-
-    @Test
-    public void add_four_sell_order_to_order_book_should_sort_from_low_to_hi_price_and_long_to_short_time() {
-        String productId = "XSS";
-        PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Sell));
 
         LOGGER.info("Ask Orders {}", book.getAsks().makeString("\n"));
         Assert.assertTrue("There should be three sell orders",book.getAsks().size() == 4);
-        Iterator<OrderBook.OrderBookEntry> it = book.getAsks().iterator();
-        OrderBook.OrderBookEntry prev = null;
+        it = book.getAsks().iterator();
+        prev = null;
         while (it.hasNext()){
             OrderBook.OrderBookEntry oe = it.next();
             if(prev == null){
@@ -110,22 +104,41 @@ public class OrderBookTest {
                 prev = oe;
             }
         }
+
+        LOGGER.info("Print Book {}", book.printOrderBook());
+
     }
 
     @Test
+    public void bigDecimal_precision_should_truncate_to_nearest_precision(){
+        BigDecimal dec = new BigDecimal(32423599.03451);
+        String actual = dec.setScale(4, RoundingMode.DOWN).toPlainString();
+        Assert.assertEquals("precision should be 32423599.0345 but is " + actual,"32423599.0345", actual);
+        dec = new BigDecimal(32423599.03459);
+        actual = dec.setScale(4, RoundingMode.DOWN).toPlainString();
+        Assert.assertEquals("precision should be 32423599.0345 but is "+ actual,"32423599.0345",actual);
+        dec = new BigDecimal(32423599.03455);
+        actual = dec.setScale(4, RoundingMode.DOWN).toPlainString();
+        Assert.assertEquals("precision should be 32423599.0345 but is "+ actual,"32423599.0345",actual);
+        dec = new BigDecimal(32423599.034);
+        actual = dec.setScale(4, RoundingMode.DOWN).toPlainString();
+        Assert.assertEquals("precision should be 32423599.0340 but is "+ actual,"32423599.0340",actual);
+
+    }
+    @Test
     public void reverse_order_book_sorting_should_sort_bid_price_from_lo_to_hi_and_ask_price_from_hi_to_lo_and_long_to_short_time(){
         String productId = "XSS";
-        PriceType pricetype = PriceType.Cash;
+        PriceType pricetype = PriceType.Spread;
         OrderBook book = createOrderBook(productId, pricetype, true);
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.01, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.03, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
 
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 4.01, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 4.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 4.03, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 4.34, 1000, Side.Sell));
 
         LOGGER.info("Bid Orders {}", book.getBids().makeString("\n"));
         Assert.assertTrue("There should be three buy orders",book.getBids().size() == 4);
@@ -165,7 +178,7 @@ public class OrderBookTest {
                 prev = oe;
             }
         }
-
+        LOGGER.info("Print Book: {}",book.printOrderBook());
 
     }
 

@@ -3,27 +3,36 @@ package com.jtk.matching.core;
 import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
+import org.eclipse.collections.api.list.MutableList;
 import org.eclipse.collections.api.set.sorted.MutableSortedSet;
 import org.eclipse.collections.impl.set.sorted.mutable.TreeSortedSet;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
 import java.util.Objects;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class OrderBook {
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderBook.class);
     private final String productId;
     private final PriceType priceType;
-    private boolean reverseOrder;
+    private final boolean reverseOrder;
     private final TreeSortedSet<OrderBookEntry> bidSet;
     private final TreeSortedSet<OrderBookEntry> askSet;
+    private final static int PRICE_SCALE = 8; // should be set fron system property
     private final Comparator<OrderBookEntry> descPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice, Comparator.reverseOrder())
             .thenComparingLong(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
+
+    volatile private AtomicReference<BigDecimal> maxAsk = new AtomicReference(BigDecimal.ZERO);
+    volatile private AtomicReference<BigDecimal> minAsk = new AtomicReference(BigDecimal.ZERO);
+    volatile private AtomicReference<BigDecimal> maxBid = new AtomicReference(BigDecimal.ZERO);
+    volatile private AtomicReference<BigDecimal> minBid = new AtomicReference(BigDecimal.ZERO);
 
     public OrderBook(String productId, PriceType priceType, boolean reverseOrder) {
         this.productId = productId;
@@ -63,12 +72,14 @@ public class OrderBook {
     }
 
     public void addOrder(Order order) {
+        OrderBookEntry orderEntry = new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN));
         if (order.getSide() == Side.Buy) {
-            bidSet.add(new OrderBookEntry(order.getOrderId(), order.getPrice()));
+            bidSet.add(orderEntry);
         } else {
-            askSet.add(new OrderBookEntry(order.getOrderId(), order.getPrice()));
+            askSet.add(orderEntry);
         }
     }
+
 
     public MutableSortedSet<OrderBookEntry> getBids() {
         return bidSet.asUnmodifiable();
@@ -76,6 +87,42 @@ public class OrderBook {
 
     public MutableSortedSet<OrderBookEntry> getAsks() {
         return askSet.asUnmodifiable();
+    }
+
+
+    public String printOrderBook(){
+        MutableList<String> bidPrices = getBids().collect(orderBookEntry -> orderBookEntry.getPrice().toPlainString());
+        MutableList<String> askPrices = getAsks().collect(orderBookEntry -> orderBookEntry.getPrice().toPlainString());
+        int minIndex = Math.min(bidPrices.size(),askPrices.size());
+        StringBuilder builder = new StringBuilder();
+        builder.append(this.toString());
+        builder.append("\n")
+                .append(String.format("%20s | %-20s%n","BID","ASK"))
+                .append(String.format("%20s | %-20s%n","--------------------","---------------------"));
+        for (int i = 0; i < minIndex; i++) {
+            builder.append(String.format("%20s | %-20s%n",bidPrices.get(i), askPrices.get(i)));
+        }
+        if(bidPrices.size() < askPrices.size()){
+            for (int i = minIndex; i < askPrices.size(); i++) {
+                builder.append(String.format("%20s | %-20s%n","",askPrices.get(i)));
+            }
+        }
+
+        if(bidPrices.size() > askPrices.size()){
+            for (int i = minIndex; i < bidPrices.size(); i++) {
+                builder.append(String.format("%20s | %-20s%n",bidPrices.get(i),""));
+            }
+        }
+        return builder.toString();
+    }
+
+    @Override
+    public String toString() {
+        return "OrderBook{" +
+                "productId='" + productId + '\'' +
+                ", priceType=" + priceType +
+                ", reverseOrder=" + reverseOrder +
+                '}';
     }
 
     class OrderBookEntry {
@@ -118,10 +165,10 @@ public class OrderBook {
 
         @Override
         public String toString() {
-            return "OrderBookOrder{" +
+            return "OrderBookEntry{" +
                     "orderId=" + orderId +
                     ", price=" + price +
-                    ", orderBookEntryTime=" + orderBookEntryTimeInMillis +
+                    ", orderBookEntryTimeInMillis=" + orderBookEntryTimeInMillis +
                     '}';
         }
     }
