@@ -1,0 +1,16 @@
+@namespace("com.jtk.matching.api.gen")
+
+protocol OrderProtocol{
+  import idl "EnumProtocols.avdl";
+
+  record Order {
+    string orderId;
+    string productId;
+    com.jtk.matching.api.gen.enums.OrderType orderType;
+    com.jtk.matching.api.gen.enums.ProductType productType;
+    timestamp_ms orderCreation;
+    date submitDate;
+    @java-class("java.math.BigDecimal") string price;
+    long quantity;
+  }
+}

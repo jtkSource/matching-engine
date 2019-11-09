@@ -1,0 +1,10 @@
+@namespace("com.jtk.matching.api.gen.enums")
+
+protocol EnumProtocol{
+  enum OrderType{
+    LIMIT, MKT
+  }
+  enum ProductType{
+    Bond, Repo
+  }
+}
