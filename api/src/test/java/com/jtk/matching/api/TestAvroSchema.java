@@ -2,6 +2,7 @@ package com.jtk.matching.api;
 
 import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.OrderType;
+import com.jtk.matching.api.gen.enums.Side;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.io.DatumReader;
@@ -46,6 +47,11 @@ public class TestAvroSchema {
                 .setProductId("XSS")
                 .setProductType(Bond)
                 .setOrderType(OrderType.LIMIT)
+                .setPrice(new BigDecimal(9))
+                .setQuantity(999)
+                .setOrderCreation(Instant.now())
+                .setSubmitDate(LocalDate.now())
+                .setSide(Side.Buy)
                 .build();
         Assert.assertEquals("order type should be bond", Bond, order.getProductType());
     }
@@ -99,6 +105,7 @@ public class TestAvroSchema {
                 .setQuantity(999)
                 .setOrderCreation(Instant.now())
                 .setSubmitDate(LocalDate.now())
+                .setSide(Side.Buy)
                 .build();
 
         LOGGER.info("Order created: {}", order.toString());

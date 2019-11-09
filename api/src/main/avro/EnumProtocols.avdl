@@ -7,4 +7,10 @@ protocol EnumProtocol{
   enum ProductType{
     Bond, Repo
   }
+  enum PriceType{
+    Cash, Spread
+  }
+  enum Side{
+    Buy, Sell
+  }
 }

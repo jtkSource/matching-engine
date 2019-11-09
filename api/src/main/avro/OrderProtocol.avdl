@@ -8,6 +8,8 @@ protocol OrderProtocol{
     string productId;
     com.jtk.matching.api.gen.enums.OrderType orderType;
     com.jtk.matching.api.gen.enums.ProductType productType;
+    com.jtk.matching.api.gen.enums.PriceType priceType = "Cash";
+    com.jtk.matching.api.gen.enums.Side side;
     timestamp_ms orderCreation;
     date submitDate;
     @java-class("java.math.BigDecimal") string price;

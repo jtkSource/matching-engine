@@ -7,7 +7,7 @@ package com.jtk.matching.api.gen.enums;
 
 @org.apache.avro.specific.AvroGenerated
 public interface EnumProtocol {
-  public static final org.apache.avro.Protocol PROTOCOL = org.apache.avro.Protocol.parse("{\"protocol\":\"EnumProtocol\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"types\":[{\"type\":\"enum\",\"name\":\"OrderType\",\"symbols\":[\"LIMIT\",\"MKT\"]},{\"type\":\"enum\",\"name\":\"ProductType\",\"symbols\":[\"Bond\",\"Repo\"]}],\"messages\":{}}");
+  public static final org.apache.avro.Protocol PROTOCOL = org.apache.avro.Protocol.parse("{\"protocol\":\"EnumProtocol\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"types\":[{\"type\":\"enum\",\"name\":\"OrderType\",\"symbols\":[\"LIMIT\",\"MKT\"]},{\"type\":\"enum\",\"name\":\"ProductType\",\"symbols\":[\"Bond\",\"Repo\"]},{\"type\":\"enum\",\"name\":\"PriceType\",\"symbols\":[\"Cash\",\"Spread\"]},{\"type\":\"enum\",\"name\":\"Side\",\"symbols\":[\"Buy\",\"Sell\"]}],\"messages\":{}}");
 
   @SuppressWarnings("all")
   public interface Callback extends EnumProtocol {
