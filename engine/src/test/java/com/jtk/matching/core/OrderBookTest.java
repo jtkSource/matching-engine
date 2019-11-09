@@ -182,6 +182,48 @@ public class OrderBookTest {
 
     }
 
+    @Test
+    public void add_to_order_book_should_return_best_bid_and_best_ask(){
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createOrderBook(productId, pricetype);
+        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+
+        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+
+        BigDecimal bestBid = book.getBestBid();
+        BigDecimal bestAsk = book.getBestAsk();
+        Assert.assertEquals("Best bid should be 99.34000000 but is","99.34000000",bestBid.toPlainString());
+        Assert.assertEquals("Best ask should be 100.01000000 but is","100.01000000",bestAsk.toPlainString());
+
+    }
+
+    @Test
+    public void add_to_order_book_should_return_best_bid_and_best_ask_for_reversedorder(){
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Spread;
+        OrderBook book = createOrderBook(productId, pricetype, true);
+        book.addOrder(createOrder(productId, 5.01, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.03, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
+
+        book.addOrder(createOrder(productId, 4.01, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 4.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 4.03, 1000, Side.Sell));
+
+        BigDecimal bestBid = book.getBestBid();
+        BigDecimal bestAsk = book.getBestAsk();
+        Assert.assertEquals("Best bid should be 5.00999999 but is","5.00999999",bestBid.toPlainString());
+        Assert.assertEquals("Best ask should be 4.33999999 but is","4.33999999",bestAsk.toPlainString());
+
+    }
 
     private Order createOrder(String productId, double price, int quantity, Side side) {
         return Order.newBuilder()

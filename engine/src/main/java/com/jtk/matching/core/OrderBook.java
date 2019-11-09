@@ -29,10 +29,8 @@ public class OrderBook {
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
 
-    volatile private AtomicReference<BigDecimal> maxAsk = new AtomicReference(BigDecimal.ZERO);
-    volatile private AtomicReference<BigDecimal> minAsk = new AtomicReference(BigDecimal.ZERO);
-    volatile private AtomicReference<BigDecimal> maxBid = new AtomicReference(BigDecimal.ZERO);
-    volatile private AtomicReference<BigDecimal> minBid = new AtomicReference(BigDecimal.ZERO);
+    volatile private AtomicReference<BigDecimal> bestAsk = new AtomicReference(BigDecimal.ZERO);
+    volatile private AtomicReference<BigDecimal> bestBid = new AtomicReference(BigDecimal.ZERO);
 
     public OrderBook(String productId, PriceType priceType, boolean reverseOrder) {
         this.productId = productId;
@@ -71,15 +69,35 @@ public class OrderBook {
         return this.priceType;
     }
 
+    //TODO: validations - price cant be negative, handling duplicate orderId
     public void addOrder(Order order) {
-        OrderBookEntry orderEntry = new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN));
+        OrderBookEntry orderEntry = new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN),order.getQuantity());
         if (order.getSide() == Side.Buy) {
+            //TODO bidlock
             bidSet.add(orderEntry);
+            updateBestBid();
         } else {
+            //TODO askLock
             askSet.add(orderEntry);
+            updateBestAsk();
         }
     }
 
+    private void updateBestBid() {
+        bestBid.set(bidSet.getFirst().price);
+    }
+
+    private void updateBestAsk(){
+        bestAsk.set(askSet.getFirst().price);
+    }
+
+    public BigDecimal getBestAsk() {
+        return bestAsk.get();
+    }
+
+    public BigDecimal getBestBid() {
+        return bestBid.get();
+    }
 
     public MutableSortedSet<OrderBookEntry> getBids() {
         return bidSet.asUnmodifiable();
@@ -128,11 +146,13 @@ public class OrderBook {
     class OrderBookEntry {
         private final CharSequence orderId;
         private final BigDecimal price;
+        private long quantity;
         private final long orderBookEntryTimeInMillis;
 
-        public OrderBookEntry(CharSequence orderId, BigDecimal price) {
+        public OrderBookEntry(CharSequence orderId, BigDecimal price, long quantity) {
             this.orderId = orderId;
             this.price = price;
+            this.quantity = quantity;
             this.orderBookEntryTimeInMillis = Instant.now().toEpochMilli();
         }
 
@@ -168,6 +188,7 @@ public class OrderBook {
             return "OrderBookEntry{" +
                     "orderId=" + orderId +
                     ", price=" + price +
+                    ", quantity=" + quantity +
                     ", orderBookEntryTimeInMillis=" + orderBookEntryTimeInMillis +
                     '}';
         }
