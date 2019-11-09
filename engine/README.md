@@ -18,8 +18,9 @@ OrderBook{productId='XSS', priceType=Spread, reverseOrder=true}
 
 ```
 Execution :
-newBid >= maxAsk
+newBid <= maxAsk
 newAsk >= minBid
+
 ```
 
 OrderBook{productId='XSS', priceType= , reverseOrder=false}
@@ -34,6 +35,6 @@ OrderBook{productId='XSS', priceType= , reverseOrder=false}
 
 ```
 Execution :
-newBid <= minAsk
+newBid >= minAsk
 newAsk <= maxBid
 ```

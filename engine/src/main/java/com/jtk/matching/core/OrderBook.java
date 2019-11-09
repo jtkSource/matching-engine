@@ -5,7 +5,9 @@ import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
 import org.eclipse.collections.api.list.MutableList;
 import org.eclipse.collections.api.set.sorted.MutableSortedSet;
+import org.eclipse.collections.api.tuple.Pair;
 import org.eclipse.collections.impl.set.sorted.mutable.TreeSortedSet;
+import org.eclipse.collections.impl.tuple.Tuples;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,17 +71,78 @@ public class OrderBook {
         return this.priceType;
     }
 
-    //TODO: validations - price cant be negative, handling duplicate orderId
+    //TODO: validations - price cant be negative, MKT prices to be supported, handling duplicate orderId
     public void addOrder(Order order) {
-        OrderBookEntry orderEntry = new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN),order.getQuantity());
+        OrderBookEntry orderEntry = new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), order.getQuantity());
         if (order.getSide() == Side.Buy) {
             //TODO bidlock
-            bidSet.add(orderEntry);
-            updateBestBid();
+            if (!isBidMatching(orderEntry)) {
+                bidSet.add(orderEntry);
+                updateBestBid();
+            } else {
+                LOGGER.info("Execute {} ", orderEntry);
+                long remainingQty = reduceAsksOnOrderBook(orderEntry);
+                if (remainingQty > 0) {
+                    orderEntry = new OrderBookEntry(orderEntry.getOrderId(), orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), remainingQty);
+                    bidSet.add(orderEntry);
+                    updateBestBid();
+                }
+            }
         } else {
             //TODO askLock
-            askSet.add(orderEntry);
-            updateBestAsk();
+            if (!isAskMatching(orderEntry)) {
+                askSet.add(orderEntry);
+                updateBestAsk();
+            } else {
+                //TODO: execute
+                LOGGER.info("Execute {} ", orderEntry);
+            }
+        }
+    }
+
+    private long reduceAsksOnOrderBook(OrderBookEntry bidEntry) {
+
+        long remainingQuantity = bidEntry.getQuantity();
+
+        while (remainingQuantity > 0 || !askSet.isEmpty()) {
+            OrderBookEntry askEntry = askSet.getFirst();
+            if (askEntry.getQuantity() <= remainingQuantity) {
+                if (askSet.remove(askEntry)) {
+                    long executedQuantity = askEntry.getQuantity();
+                    createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                    remainingQuantity = bidEntry.getQuantity() - executedQuantity;
+                    updateBestAsk();
+                }
+            } else if (askEntry.getQuantity() > bidEntry.getQuantity()) {
+                long executedQuantity = askEntry.getQuantity() - bidEntry.getQuantity();
+                remainingQuantity = 0;
+                askEntry.setQuantity(executedQuantity);
+                createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+            }
+            bidEntry = new OrderBookEntry(bidEntry.getOrderId(), bidEntry.getPrice(), remainingQuantity);
+            if (remainingQuantity <=0 || !isBidMatching(bidEntry))
+                break;
+        }
+        return remainingQuantity;
+    }
+
+    private void createExecution(long executedQuantity, BigDecimal executedPrice, String bidOrderId, String askOrderId, Instant now) {
+        LOGGER.info("Execution created executedQuantity: {}, executedPrice {} @{}", executedQuantity, executedPrice, now);
+    }
+
+    private boolean isAskMatching(OrderBookEntry newAsk) {
+        if (!reverseOrder) {
+            return newAsk.getPrice().compareTo(bestBid.get()) <= 0;
+        } else {
+            return newAsk.getPrice().compareTo(bestBid.get()) >= 0 && bestBid.get() != BigDecimal.ZERO;
+        }
+    }
+
+    private boolean isBidMatching(OrderBookEntry newBid) {
+        if (!reverseOrder) {
+            return newBid.getPrice().compareTo(bestAsk.get()) >= 0 && bestAsk.get() != BigDecimal.ZERO;
+        } else {
+            return newBid.getPrice().compareTo(bestAsk.get()) <= 0;
         }
     }
 
@@ -87,7 +150,7 @@ public class OrderBook {
         bestBid.set(bidSet.getFirst().price);
     }
 
-    private void updateBestAsk(){
+    private void updateBestAsk() {
         bestAsk.set(askSet.getFirst().price);
     }
 
@@ -108,27 +171,27 @@ public class OrderBook {
     }
 
 
-    public String printOrderBook(){
-        MutableList<String> bidPrices = getBids().collect(orderBookEntry -> orderBookEntry.getPrice().toPlainString());
-        MutableList<String> askPrices = getAsks().collect(orderBookEntry -> orderBookEntry.getPrice().toPlainString());
-        int minIndex = Math.min(bidPrices.size(),askPrices.size());
+    public String printOrderBook() {
+        MutableList<Pair<String, String>> bidPrices = getBids().collect(orderBookEntry -> Tuples.pair(orderBookEntry.getPrice().toPlainString(), String.valueOf(orderBookEntry.getQuantity())));
+        MutableList<Pair<String, String>> askPrices = getAsks().collect(orderBookEntry -> Tuples.pair(orderBookEntry.getPrice().toPlainString(), String.valueOf(orderBookEntry.getQuantity())));
+        int minIndex = Math.min(bidPrices.size(), askPrices.size());
         StringBuilder builder = new StringBuilder();
         builder.append(this.toString());
         builder.append("\n")
-                .append(String.format("%20s | %-20s%n","BID","ASK"))
-                .append(String.format("%20s | %-20s%n","--------------------","---------------------"));
+                .append(String.format("%10s | %20s | %-20s | %10s%n", "QTY", "BID", "ASK", "QTY"))
+                .append(String.format("%10s | %20s | %-20s | %10s%n", "----------", "-------------------", "-------------------", "----------"));
         for (int i = 0; i < minIndex; i++) {
-            builder.append(String.format("%20s | %-20s%n",bidPrices.get(i), askPrices.get(i)));
+            builder.append(String.format("%10s | %20s | %-20s | %10s%n", bidPrices.get(i).getTwo(), bidPrices.get(i).getOne(), askPrices.get(i).getOne(), askPrices.get(i).getTwo()));
         }
-        if(bidPrices.size() < askPrices.size()){
+        if (bidPrices.size() < askPrices.size()) {
             for (int i = minIndex; i < askPrices.size(); i++) {
-                builder.append(String.format("%20s | %-20s%n","",askPrices.get(i)));
+                builder.append(String.format("%10s | %20s | %-20s | %10s%n", "", "", askPrices.get(i).getOne(), askPrices.get(i).getTwo()));
             }
         }
 
-        if(bidPrices.size() > askPrices.size()){
+        if (bidPrices.size() > askPrices.size()) {
             for (int i = minIndex; i < bidPrices.size(); i++) {
-                builder.append(String.format("%20s | %-20s%n",bidPrices.get(i),""));
+                builder.append(String.format("%10s | %20s | %-20s | %10s%n", bidPrices.get(i).getTwo(), bidPrices.get(i).getOne(), "", ""));
             }
         }
         return builder.toString();
@@ -166,6 +229,14 @@ public class OrderBook {
 
         public long getOrderBookEntryTimeInMillis() {
             return orderBookEntryTimeInMillis;
+        }
+
+        public long getQuantity() {
+            return quantity;
+        }
+
+        public void setQuantity(long quantity) {
+            this.quantity = quantity;
         }
 
         @Override
