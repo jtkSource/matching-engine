@@ -17,22 +17,37 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 public class OrderBook {
+
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderBook.class);
-    private final String productId;
-    private final PriceType priceType;
-    private final boolean reverseOrder;
-    private final TreeSortedSet<OrderBookEntry> bidSet;
-    private final TreeSortedSet<OrderBookEntry> askSet;
+
     private final static int PRICE_SCALE = 8; // should be set fron system property
+
+    private final String productId;
+
+    private final PriceType priceType;
+
+    private final boolean reverseOrder;
+
+    private final TreeSortedSet<OrderBookEntry> bidSet;
+
+    private final TreeSortedSet<OrderBookEntry> askSet;
+
     private final Comparator<OrderBookEntry> descPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice, Comparator.reverseOrder())
             .thenComparingLong(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
+
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
 
     volatile private AtomicReference<BigDecimal> bestAsk = new AtomicReference(BigDecimal.ZERO);
+
     volatile private AtomicReference<BigDecimal> bestBid = new AtomicReference(BigDecimal.ZERO);
+
+    private final ReentrantReadWriteLock bidRWLock = new ReentrantReadWriteLock();
+
+    private final ReentrantReadWriteLock askRWLock = new ReentrantReadWriteLock();
 
     public OrderBook(String productId, PriceType priceType, boolean reverseOrder) {
         this.productId = productId;
@@ -71,92 +86,119 @@ public class OrderBook {
         return this.priceType;
     }
 
-    //TODO: validations - price cant be negative, MKT prices to be supported, handling duplicate orderId
+    //TODO: validations - price cant be negative, MKT prices to be supported, handling order quantity amends, handling order price amends
     public void addOrder(Order order) {
         OrderBookEntry orderEntry = new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), order.getQuantity());
+
         if (order.getSide() == Side.Buy) {
-            //TODO bidlock
+
             if (!isBidMatching(orderEntry)) {
-                bidSet.add(orderEntry);
-                updateBestBid();
-            } else {
-                LOGGER.info("Execute {} ", orderEntry);
-                long remainingQty = reduceAsksOnOrderBook(orderEntry);
-                if (remainingQty > 0) {
-                    orderEntry = new OrderBookEntry(orderEntry.getOrderId(), orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), remainingQty);
+                try {
+                    bidRWLock.writeLock().lock();
                     bidSet.add(orderEntry);
                     updateBestBid();
+                }finally {
+                    bidRWLock.writeLock().unlock();
+                }
+            } else {
+                    long remainingQty = reduceAsksOnOrderBook(orderEntry);
+                try {
+                    bidRWLock.writeLock().lock();
+                    if (remainingQty > 0) {
+                        orderEntry = new OrderBookEntry(orderEntry.getOrderId(), orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), remainingQty);
+                        bidSet.add(orderEntry);
+                        updateBestBid();
+                    }
+                }finally {
+                    bidRWLock.writeLock().unlock();
                 }
             }
+
         } else {
-            //TODO askLock
             if (!isAskMatching(orderEntry)) {
-                askSet.add(orderEntry);
-                updateBestAsk();
-            } else {
-                //TODO: execute
-                LOGGER.info("Execute {} ", orderEntry);
-                long remainingQty = reduceBidsOnOrderBook(orderEntry);
-                if(remainingQty > 0){
-                    orderEntry = new OrderBookEntry(orderEntry.getOrderId(),orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), remainingQty);
+                try {
+                    askRWLock.writeLock().lock();
                     askSet.add(orderEntry);
                     updateBestAsk();
+                }finally {
+                    askRWLock.writeLock().unlock();
                 }
-
+            } else {
+                LOGGER.info("Execute {} ", orderEntry);
+                long remainingQty = reduceBidsOnOrderBook(orderEntry);
+                try {
+                    askRWLock.writeLock().lock();
+                    if (remainingQty > 0) {
+                        orderEntry = new OrderBookEntry(orderEntry.getOrderId(), orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), remainingQty);
+                        askSet.add(orderEntry);
+                        updateBestAsk();
+                    }
+                }finally {
+                    askRWLock.writeLock().unlock();
+                }
             }
         }
     }
 
     private long reduceAsksOnOrderBook(OrderBookEntry bidEntry) {
+        try {
+            askRWLock.writeLock().lock();
+            long remainingQuantity = bidEntry.getQuantity();
 
-        long remainingQuantity = bidEntry.getQuantity();
-
-        while (remainingQuantity > 0 || !askSet.isEmpty()) {
-            OrderBookEntry askEntry = askSet.getFirst();
-            if (askEntry.getQuantity() <= remainingQuantity) {
-                if (askSet.remove(askEntry)) {
-                    long executedQuantity = askEntry.getQuantity();
+            while (remainingQuantity > 0 || !askSet.isEmpty()) {
+                OrderBookEntry askEntry = askSet.getFirst();
+                if (askEntry.getQuantity() <= remainingQuantity) {
+                    if (askSet.remove(askEntry)) {
+                        long executedQuantity = askEntry.getQuantity();
+                        createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                        remainingQuantity = bidEntry.getQuantity() - executedQuantity;
+                        updateBestAsk();
+                    }
+                } else if (askEntry.getQuantity() > bidEntry.getQuantity()) {
+                    long executedQuantity = askEntry.getQuantity() - bidEntry.getQuantity();
+                    remainingQuantity = 0;
+                    askEntry.quantity = executedQuantity;
                     createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
-                    remainingQuantity = bidEntry.getQuantity() - executedQuantity;
-                    updateBestAsk();
                 }
-            } else if (askEntry.getQuantity() > bidEntry.getQuantity()) {
-                long executedQuantity = askEntry.getQuantity() - bidEntry.getQuantity();
-                remainingQuantity = 0;
-                askEntry.quantity = executedQuantity;
-                createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                if (remainingQuantity <= 0 || !isBidMatching(bidEntry))
+                    break;
+                bidEntry = new OrderBookEntry(bidEntry.getOrderId(), bidEntry.getPrice(), remainingQuantity);
             }
-            if (remainingQuantity <= 0 || !isBidMatching(bidEntry))
-                break;
-            bidEntry = new OrderBookEntry(bidEntry.getOrderId(), bidEntry.getPrice(), remainingQuantity);
+            return remainingQuantity;
+        }finally {
+            askRWLock.writeLock().unlock();
         }
-        return remainingQuantity;
     }
 
     private long reduceBidsOnOrderBook(OrderBookEntry askEntry) {
 
-        long remainingQuantity = askEntry.getQuantity();
+        try {
+            bidRWLock.writeLock().lock();
+            long remainingQuantity = askEntry.getQuantity();
 
-        while (remainingQuantity > 0 || !bidSet.isEmpty()) {
-            OrderBookEntry bidEntry = bidSet.getFirst();
-            if (bidEntry.getQuantity() <= remainingQuantity) {
-                if (bidSet.remove(bidEntry)) {
-                    long executedQuantity = bidEntry.getQuantity();
+            while (remainingQuantity > 0 || !bidSet.isEmpty()) {
+                OrderBookEntry bidEntry = bidSet.getFirst();
+                if (bidEntry.getQuantity() <= remainingQuantity) {
+                    if (bidSet.remove(bidEntry)) {
+                        long executedQuantity = bidEntry.getQuantity();
+                        createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                        remainingQuantity = askEntry.getQuantity() - executedQuantity;
+                        updateBestBid();
+                    }
+                } else if (bidEntry.getQuantity() > askEntry.getQuantity()) {
+                    long executedQuantity = bidEntry.getQuantity() - askEntry.getQuantity();
+                    remainingQuantity = 0;
+                    bidEntry.quantity = executedQuantity;
                     createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
-                    remainingQuantity = askEntry.getQuantity() - executedQuantity;
-                    updateBestBid();
                 }
-            } else if (bidEntry.getQuantity() > askEntry.getQuantity()) {
-                long executedQuantity = bidEntry.getQuantity() - askEntry.getQuantity();
-                remainingQuantity = 0;
-                bidEntry.quantity = executedQuantity;
-                createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                if (remainingQuantity <= 0 || !isAskMatching(askEntry))
+                    break;
+                askEntry = new OrderBookEntry(askEntry.getOrderId(), askEntry.getPrice(), remainingQuantity);
             }
-            if (remainingQuantity <= 0 || !isAskMatching(askEntry))
-                break;
-            askEntry = new OrderBookEntry(askEntry.getOrderId(), askEntry.getPrice(), remainingQuantity);
+            return remainingQuantity;
+        }finally {
+            bidRWLock.writeLock().unlock();
         }
-        return remainingQuantity;
     }
 
     private void createExecution(long executedQuantity, BigDecimal executedPrice, String bidOrderId, String askOrderId, Instant now) {
@@ -195,11 +237,11 @@ public class OrderBook {
         return bestBid.get();
     }
 
-    public MutableSortedSet<OrderBookEntry> getBids() {
+    MutableSortedSet<OrderBookEntry> getBids() {
         return bidSet.asUnmodifiable();
     }
 
-    public MutableSortedSet<OrderBookEntry> getAsks() {
+    MutableSortedSet<OrderBookEntry> getAsks() {
         return askSet.asUnmodifiable();
     }
 
@@ -239,11 +281,11 @@ public class OrderBook {
                 '}';
     }
 
-    class OrderBookEntry {
+    final class OrderBookEntry {
         private final CharSequence orderId;
         private final BigDecimal price;
-        private long quantity;
         private final long orderBookEntryTimeInMillis;
+        private long quantity;
 
         public OrderBookEntry(CharSequence orderId, BigDecimal price, long quantity) {
             this.orderId = orderId;
