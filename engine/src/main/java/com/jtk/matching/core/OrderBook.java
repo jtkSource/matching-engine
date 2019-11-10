@@ -96,6 +96,13 @@ public class OrderBook {
             } else {
                 //TODO: execute
                 LOGGER.info("Execute {} ", orderEntry);
+                long remainingQty = reduceBidsOnOrderBook(orderEntry);
+                if(remainingQty > 0){
+                    orderEntry = new OrderBookEntry(orderEntry.getOrderId(),orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN), remainingQty);
+                    askSet.add(orderEntry);
+                    updateBestAsk();
+                }
+
             }
         }
     }
@@ -116,12 +123,38 @@ public class OrderBook {
             } else if (askEntry.getQuantity() > bidEntry.getQuantity()) {
                 long executedQuantity = askEntry.getQuantity() - bidEntry.getQuantity();
                 remainingQuantity = 0;
-                askEntry.setQuantity(executedQuantity);
+                askEntry.quantity = executedQuantity;
                 createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
             }
-            bidEntry = new OrderBookEntry(bidEntry.getOrderId(), bidEntry.getPrice(), remainingQuantity);
-            if (remainingQuantity <=0 || !isBidMatching(bidEntry))
+            if (remainingQuantity <= 0 || !isBidMatching(bidEntry))
                 break;
+            bidEntry = new OrderBookEntry(bidEntry.getOrderId(), bidEntry.getPrice(), remainingQuantity);
+        }
+        return remainingQuantity;
+    }
+
+    private long reduceBidsOnOrderBook(OrderBookEntry askEntry) {
+
+        long remainingQuantity = askEntry.getQuantity();
+
+        while (remainingQuantity > 0 || !bidSet.isEmpty()) {
+            OrderBookEntry bidEntry = bidSet.getFirst();
+            if (bidEntry.getQuantity() <= remainingQuantity) {
+                if (bidSet.remove(bidEntry)) {
+                    long executedQuantity = bidEntry.getQuantity();
+                    createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                    remainingQuantity = askEntry.getQuantity() - executedQuantity;
+                    updateBestBid();
+                }
+            } else if (bidEntry.getQuantity() > askEntry.getQuantity()) {
+                long executedQuantity = bidEntry.getQuantity() - askEntry.getQuantity();
+                remainingQuantity = 0;
+                bidEntry.quantity = executedQuantity;
+                createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+            }
+            if (remainingQuantity <= 0 || !isAskMatching(askEntry))
+                break;
+            askEntry = new OrderBookEntry(askEntry.getOrderId(), askEntry.getPrice(), remainingQuantity);
         }
         return remainingQuantity;
     }
@@ -233,10 +266,6 @@ public class OrderBook {
 
         public long getQuantity() {
             return quantity;
-        }
-
-        public void setQuantity(long quantity) {
-            this.quantity = quantity;
         }
 
         @Override
