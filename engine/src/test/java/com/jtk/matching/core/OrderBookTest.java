@@ -4,10 +4,12 @@ import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.OrderType;
 import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
+import org.eclipse.collections.api.tuple.Pair;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.scheduler.Schedulers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -17,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.Executors;
 
 import static com.jtk.matching.api.gen.enums.ProductType.Bond;
 
@@ -278,6 +281,7 @@ public class OrderBookTest {
         LOGGER.info("Before Execution {}", book.printOrderBook());
 
         Order matchingAsk = createOrder(productId, 99.34, 1500, Side.Sell);
+
         book.addOrder(matchingAsk);
 
         LOGGER.info("After Execution {}", book.printOrderBook());
@@ -297,8 +301,13 @@ public class OrderBookTest {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createOrderBook(productId, pricetype);
-        List<OrderBook.OrderBookEntry> listOfNego = new ArrayList<>();
-        book.getNegotiationFlux().subscribe(listOfNego::add);
+        List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
+        book.getNegotiationFlux()
+                .subscribe(orderBookEntry -> {
+                    LOGGER.info("Received new negotiation");
+                    listOfNego.add(orderBookEntry);
+                }
+        );
 
         book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
         book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
@@ -319,8 +328,8 @@ public class OrderBookTest {
 
         Assert.assertEquals("There should 2 orders to negotiate against but there is "+listOfNego.size(),
                 2, listOfNego.size());
-        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(0).getPrice().doubleValue() <= 0.01);
-        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(1).getPrice().doubleValue() <= 0.01);
+        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(0).getTwo().getPrice().doubleValue() <= 0.01);
+        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(1).getTwo().getPrice().doubleValue() <= 0.01);
 
     }
 
@@ -330,7 +339,7 @@ public class OrderBookTest {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createOrderBook(productId, pricetype);
-        List<OrderBook.OrderBookEntry> listOfNego = new ArrayList<>();
+        List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
         book.getNegotiationFlux().subscribe(listOfNego::add);
 
         book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
@@ -352,7 +361,7 @@ public class OrderBookTest {
 
         Assert.assertEquals("There should 1 orders to negotiate against but there is "+listOfNego.size(),
                 1, listOfNego.size());
-        Assert.assertTrue("Price is within DO of 0.01",listOfNego.get(0).getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
+        Assert.assertTrue("Price is within DO of 0.01",listOfNego.get(0).getTwo().getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
     }
 
     private Order createOrder(String productId, double price, int quantity, Side side) {

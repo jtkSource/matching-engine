@@ -10,16 +10,22 @@ import org.eclipse.collections.impl.set.sorted.mutable.TreeSortedSet;
 import org.eclipse.collections.impl.tuple.Tuples;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import reactor.core.publisher.ConnectableFlux;
 import reactor.core.publisher.DirectProcessor;
 import reactor.core.publisher.Flux;
+import reactor.core.scheduler.Schedulers;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 public class OrderBook {
 
@@ -42,7 +48,7 @@ public class OrderBook {
 
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
-    private final DirectProcessor<OrderBookEntry> negoSource;
+    private final DirectProcessor<Pair<OrderBookEntry, OrderBookEntry>> negoSource;
 
     volatile private AtomicReference<BigDecimal> bestAsk = new AtomicReference(BigDecimal.ZERO);
 
@@ -64,6 +70,7 @@ public class OrderBook {
             this.askSet = TreeSortedSet.newSet(descPriceTimeComparator);
         }
         negoSource = DirectProcessor.create();
+        negoSource.publishOn(Schedulers.elastic()).log();
     }
 
     /**
@@ -90,7 +97,7 @@ public class OrderBook {
         return this.priceType;
     }
 
-    public Flux<OrderBookEntry> getNegotiationFlux() {
+    public Flux<Pair<OrderBookEntry, OrderBookEntry>> getNegotiationFlux() {
         return negoSource.cache();
     }
 
@@ -104,43 +111,52 @@ public class OrderBook {
         } else {
             addSellOrder(orderEntry);
         }
-        findOrdersWithinDO(orderEntry).forEach(negoSource::onNext);
+        findOrdersWithinDO(orderEntry);
     }
 
-    private TreeSortedSet<OrderBookEntry> findOrdersWithinDO(OrderBookEntry orderBookEntry) {
+    private void findOrdersWithinDO(OrderBookEntry orderBookEntry) {
 
-        final BigDecimal price = orderBookEntry.getPrice();
-        TreeSortedSet<OrderBookEntry> nego;
-        if (orderBookEntry.getSide() == Side.Buy) {
-            BigDecimal offSetPrice = reverseOrder ?
-                    price.subtract(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset())) :
-                    price.add(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset()));
-            try {
-                askRWLock.readLock().lock();
+        Flux.<Pair<OrderBookEntry, OrderBookEntry>>create(fluxSink -> {
+            final BigDecimal price = orderBookEntry.getPrice();
+            List<Pair<OrderBookEntry, OrderBookEntry>> nego;
+            if (orderBookEntry.getSide() == Side.Buy) {
+                BigDecimal offSetPrice = reverseOrder ?
+                        price.subtract(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset())) :
+                        price.add(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset()));
+                try {
+                    askRWLock.readLock().lock();
 
-                nego = askSet
-                        .select(oe -> reverseOrder ?
-                                oe.getPrice().compareTo(offSetPrice) >= 0 && oe.getPrice().compareTo(price) <= 0 :
-                                oe.getPrice().compareTo(offSetPrice) <= 0 && oe.getPrice().compareTo(price) >= 0);
-            } finally {
-                askRWLock.readLock().unlock();
+                    nego = askSet
+                            .select(oe -> reverseOrder ?
+                                    oe.getPrice().compareTo(offSetPrice) >= 0 && oe.getPrice().compareTo(price) <= 0 :
+                                    oe.getPrice().compareTo(offSetPrice) <= 0 && oe.getPrice().compareTo(price) >= 0)
+                            .stream()
+                            .map(oe -> Tuples.pair(orderBookEntry, oe))
+                            .collect(Collectors.toList());
+                } finally {
+                    askRWLock.readLock().unlock();
+                }
+            } else {
+                BigDecimal offSetPrice = reverseOrder ?
+                        price.add(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset())) :
+                        price.subtract(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset()));
+                try {
+                    bidRWLock.readLock().lock();
+                    nego = bidSet.select(
+                            oe -> reverseOrder ?
+                                    oe.getPrice().compareTo(offSetPrice) <= 0 && oe.getPrice().compareTo(price) >= 0 :
+                                    oe.getPrice().compareTo(offSetPrice) >= 0 && oe.getPrice().compareTo(price) <= 0)
+                            .stream()
+                            .map(oe -> Tuples.pair(orderBookEntry, oe))
+                            .collect(Collectors.toList());
+                } finally {
+                    bidRWLock.readLock().unlock();
+                }
             }
-        } else {
-            BigDecimal offSetPrice = reverseOrder ?
-                    price.add(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset())) :
-                    price.subtract(BigDecimal.valueOf(orderBookEntry.getDiscretionaryOffset()));
-            try {
-                bidRWLock.readLock().lock();
-                nego = bidSet.select(
-                        oe -> reverseOrder ?
-                                oe.getPrice().compareTo(offSetPrice) <= 0 && oe.getPrice().compareTo(price) >= 0 :
-                                oe.getPrice().compareTo(offSetPrice) >= 0 && oe.getPrice().compareTo(price) <= 0);
-            } finally {
-                bidRWLock.readLock().unlock();
-            }
-        }
-        LOGGER.info("Negotiations {} ", nego);
-        return nego;
+            nego.forEach(fluxSink::next);
+        }).doOnNext(negoSource::onNext)
+                .publish()
+                .connect();
     }
 
     private void addSellOrder(OrderBookEntry orderEntry) {
