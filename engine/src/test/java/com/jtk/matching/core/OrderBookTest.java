@@ -224,8 +224,8 @@ public class OrderBookTest {
 
         BigDecimal bestBid = book.getBestBid();
         BigDecimal bestAsk = book.getBestAsk();
-        Assert.assertEquals("Best bid should be 5.00999999 but is", "5.00999999", bestBid.toPlainString());
-        Assert.assertEquals("Best ask should be 4.33999999 but is", "4.33999999", bestAsk.toPlainString());
+        Assert.assertEquals("Best bid should be 5.01000000", "5.01000000", bestBid.toPlainString());
+        Assert.assertEquals("Best ask should be 4.34000000", "4.34000000", bestAsk.toPlainString());
 
     }
 
