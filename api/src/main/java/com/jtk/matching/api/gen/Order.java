@@ -14,8 +14,8 @@ import org.apache.avro.message.SchemaStore;
 
 @org.apache.avro.specific.AvroGenerated
 public class Order extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -8360490497118940041L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Order\",\"namespace\":\"com.jtk.matching.api.gen\",\"fields\":[{\"name\":\"orderId\",\"type\":\"string\"},{\"name\":\"productId\",\"type\":\"string\"},{\"name\":\"orderType\",\"type\":{\"type\":\"enum\",\"name\":\"OrderType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"LIMIT\",\"MKT\"]}},{\"name\":\"productType\",\"type\":{\"type\":\"enum\",\"name\":\"ProductType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Bond\",\"Repo\"]}},{\"name\":\"priceType\",\"type\":{\"type\":\"enum\",\"name\":\"PriceType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Cash\",\"Spread\"]},\"default\":\"Cash\"},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"Side\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Buy\",\"Sell\"]}},{\"name\":\"orderCreation\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}},{\"name\":\"submitDate\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}},{\"name\":\"price\",\"type\":{\"type\":\"string\",\"java-class\":\"java.math.BigDecimal\"}},{\"name\":\"quantity\",\"type\":\"long\"}]}");
+  private static final long serialVersionUID = -1867773005019056189L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Order\",\"namespace\":\"com.jtk.matching.api.gen\",\"fields\":[{\"name\":\"orderId\",\"type\":\"string\"},{\"name\":\"productId\",\"type\":\"string\"},{\"name\":\"orderType\",\"type\":{\"type\":\"enum\",\"name\":\"OrderType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"LIMIT\",\"MKT\"]},\"default\":\"LIMIT\"},{\"name\":\"productType\",\"type\":{\"type\":\"enum\",\"name\":\"ProductType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Bond\",\"Repo\"]}},{\"name\":\"priceType\",\"type\":{\"type\":\"enum\",\"name\":\"PriceType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Cash\",\"Spread\"]},\"default\":\"Cash\"},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"Side\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Buy\",\"Sell\"]}},{\"name\":\"msgType\",\"type\":{\"type\":\"enum\",\"name\":\"MsgType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"New\",\"Amend\",\"Cancel\",\"IOI\"]},\"default\":\"New\"},{\"name\":\"orderCreation\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}},{\"name\":\"submitDate\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}},{\"name\":\"price\",\"type\":{\"type\":\"string\",\"java-class\":\"java.math.BigDecimal\"}},{\"name\":\"discretionaryOffset\",\"type\":\"double\",\"default\":0.0},{\"name\":\"quantity\",\"type\":\"long\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
 
   private static SpecificData MODEL$ = new SpecificData();
@@ -82,9 +82,11 @@ static {
   @Deprecated public com.jtk.matching.api.gen.enums.ProductType productType;
   @Deprecated public com.jtk.matching.api.gen.enums.PriceType priceType;
   @Deprecated public com.jtk.matching.api.gen.enums.Side side;
+  @Deprecated public com.jtk.matching.api.gen.enums.MsgType msgType;
   @Deprecated public java.time.Instant orderCreation;
   @Deprecated public java.time.LocalDate submitDate;
   @Deprecated public java.math.BigDecimal price;
+  @Deprecated public double discretionaryOffset;
   @Deprecated public long quantity;
 
   /**
@@ -102,21 +104,25 @@ static {
    * @param productType The new value for productType
    * @param priceType The new value for priceType
    * @param side The new value for side
+   * @param msgType The new value for msgType
    * @param orderCreation The new value for orderCreation
    * @param submitDate The new value for submitDate
    * @param price The new value for price
+   * @param discretionaryOffset The new value for discretionaryOffset
    * @param quantity The new value for quantity
    */
-  public Order(java.lang.CharSequence orderId, java.lang.CharSequence productId, com.jtk.matching.api.gen.enums.OrderType orderType, com.jtk.matching.api.gen.enums.ProductType productType, com.jtk.matching.api.gen.enums.PriceType priceType, com.jtk.matching.api.gen.enums.Side side, java.time.Instant orderCreation, java.time.LocalDate submitDate, java.math.BigDecimal price, java.lang.Long quantity) {
+  public Order(java.lang.CharSequence orderId, java.lang.CharSequence productId, com.jtk.matching.api.gen.enums.OrderType orderType, com.jtk.matching.api.gen.enums.ProductType productType, com.jtk.matching.api.gen.enums.PriceType priceType, com.jtk.matching.api.gen.enums.Side side, com.jtk.matching.api.gen.enums.MsgType msgType, java.time.Instant orderCreation, java.time.LocalDate submitDate, java.math.BigDecimal price, java.lang.Double discretionaryOffset, java.lang.Long quantity) {
     this.orderId = orderId;
     this.productId = productId;
     this.orderType = orderType;
     this.productType = productType;
     this.priceType = priceType;
     this.side = side;
+    this.msgType = msgType;
     this.orderCreation = orderCreation.truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
     this.submitDate = submitDate;
     this.price = price;
+    this.discretionaryOffset = discretionaryOffset;
     this.quantity = quantity;
   }
 
@@ -131,10 +137,12 @@ static {
     case 3: return productType;
     case 4: return priceType;
     case 5: return side;
-    case 6: return orderCreation;
-    case 7: return submitDate;
-    case 8: return price;
-    case 9: return quantity;
+    case 6: return msgType;
+    case 7: return orderCreation;
+    case 8: return submitDate;
+    case 9: return price;
+    case 10: return discretionaryOffset;
+    case 11: return quantity;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -147,8 +155,10 @@ static {
       null,
       null,
       null,
+      null,
       new org.apache.avro.data.TimeConversions.TimestampMillisConversion(),
       new org.apache.avro.data.TimeConversions.DateConversion(),
+      null,
       null,
       null,
       null
@@ -169,10 +179,12 @@ static {
     case 3: productType = (com.jtk.matching.api.gen.enums.ProductType)value$; break;
     case 4: priceType = (com.jtk.matching.api.gen.enums.PriceType)value$; break;
     case 5: side = (com.jtk.matching.api.gen.enums.Side)value$; break;
-    case 6: orderCreation = (java.time.Instant)value$; break;
-    case 7: submitDate = (java.time.LocalDate)value$; break;
-    case 8: price = (java.math.BigDecimal)value$; break;
-    case 9: quantity = (java.lang.Long)value$; break;
+    case 6: msgType = (com.jtk.matching.api.gen.enums.MsgType)value$; break;
+    case 7: orderCreation = (java.time.Instant)value$; break;
+    case 8: submitDate = (java.time.LocalDate)value$; break;
+    case 9: price = (java.math.BigDecimal)value$; break;
+    case 10: discretionaryOffset = (java.lang.Double)value$; break;
+    case 11: quantity = (java.lang.Long)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
     }
   }
@@ -280,6 +292,23 @@ static {
   }
 
   /**
+   * Gets the value of the 'msgType' field.
+   * @return The value of the 'msgType' field.
+   */
+  public com.jtk.matching.api.gen.enums.MsgType getMsgType() {
+    return msgType;
+  }
+
+
+  /**
+   * Sets the value of the 'msgType' field.
+   * @param value the value to set.
+   */
+  public void setMsgType(com.jtk.matching.api.gen.enums.MsgType value) {
+    this.msgType = value;
+  }
+
+  /**
    * Gets the value of the 'orderCreation' field.
    * @return The value of the 'orderCreation' field.
    */
@@ -328,6 +357,23 @@ static {
    */
   public void setPrice(java.math.BigDecimal value) {
     this.price = value;
+  }
+
+  /**
+   * Gets the value of the 'discretionaryOffset' field.
+   * @return The value of the 'discretionaryOffset' field.
+   */
+  public double getDiscretionaryOffset() {
+    return discretionaryOffset;
+  }
+
+
+  /**
+   * Sets the value of the 'discretionaryOffset' field.
+   * @param value the value to set.
+   */
+  public void setDiscretionaryOffset(double value) {
+    this.discretionaryOffset = value;
   }
 
   /**
@@ -393,9 +439,11 @@ static {
     private com.jtk.matching.api.gen.enums.ProductType productType;
     private com.jtk.matching.api.gen.enums.PriceType priceType;
     private com.jtk.matching.api.gen.enums.Side side;
+    private com.jtk.matching.api.gen.enums.MsgType msgType;
     private java.time.Instant orderCreation;
     private java.time.LocalDate submitDate;
     private java.math.BigDecimal price;
+    private double discretionaryOffset;
     private long quantity;
 
     /** Creates a new Builder */
@@ -433,21 +481,29 @@ static {
         this.side = data().deepCopy(fields()[5].schema(), other.side);
         fieldSetFlags()[5] = other.fieldSetFlags()[5];
       }
-      if (isValidValue(fields()[6], other.orderCreation)) {
-        this.orderCreation = data().deepCopy(fields()[6].schema(), other.orderCreation);
+      if (isValidValue(fields()[6], other.msgType)) {
+        this.msgType = data().deepCopy(fields()[6].schema(), other.msgType);
         fieldSetFlags()[6] = other.fieldSetFlags()[6];
       }
-      if (isValidValue(fields()[7], other.submitDate)) {
-        this.submitDate = data().deepCopy(fields()[7].schema(), other.submitDate);
+      if (isValidValue(fields()[7], other.orderCreation)) {
+        this.orderCreation = data().deepCopy(fields()[7].schema(), other.orderCreation);
         fieldSetFlags()[7] = other.fieldSetFlags()[7];
       }
-      if (isValidValue(fields()[8], other.price)) {
-        this.price = data().deepCopy(fields()[8].schema(), other.price);
+      if (isValidValue(fields()[8], other.submitDate)) {
+        this.submitDate = data().deepCopy(fields()[8].schema(), other.submitDate);
         fieldSetFlags()[8] = other.fieldSetFlags()[8];
       }
-      if (isValidValue(fields()[9], other.quantity)) {
-        this.quantity = data().deepCopy(fields()[9].schema(), other.quantity);
+      if (isValidValue(fields()[9], other.price)) {
+        this.price = data().deepCopy(fields()[9].schema(), other.price);
         fieldSetFlags()[9] = other.fieldSetFlags()[9];
+      }
+      if (isValidValue(fields()[10], other.discretionaryOffset)) {
+        this.discretionaryOffset = data().deepCopy(fields()[10].schema(), other.discretionaryOffset);
+        fieldSetFlags()[10] = other.fieldSetFlags()[10];
+      }
+      if (isValidValue(fields()[11], other.quantity)) {
+        this.quantity = data().deepCopy(fields()[11].schema(), other.quantity);
+        fieldSetFlags()[11] = other.fieldSetFlags()[11];
       }
     }
 
@@ -481,21 +537,29 @@ static {
         this.side = data().deepCopy(fields()[5].schema(), other.side);
         fieldSetFlags()[5] = true;
       }
-      if (isValidValue(fields()[6], other.orderCreation)) {
-        this.orderCreation = data().deepCopy(fields()[6].schema(), other.orderCreation);
+      if (isValidValue(fields()[6], other.msgType)) {
+        this.msgType = data().deepCopy(fields()[6].schema(), other.msgType);
         fieldSetFlags()[6] = true;
       }
-      if (isValidValue(fields()[7], other.submitDate)) {
-        this.submitDate = data().deepCopy(fields()[7].schema(), other.submitDate);
+      if (isValidValue(fields()[7], other.orderCreation)) {
+        this.orderCreation = data().deepCopy(fields()[7].schema(), other.orderCreation);
         fieldSetFlags()[7] = true;
       }
-      if (isValidValue(fields()[8], other.price)) {
-        this.price = data().deepCopy(fields()[8].schema(), other.price);
+      if (isValidValue(fields()[8], other.submitDate)) {
+        this.submitDate = data().deepCopy(fields()[8].schema(), other.submitDate);
         fieldSetFlags()[8] = true;
       }
-      if (isValidValue(fields()[9], other.quantity)) {
-        this.quantity = data().deepCopy(fields()[9].schema(), other.quantity);
+      if (isValidValue(fields()[9], other.price)) {
+        this.price = data().deepCopy(fields()[9].schema(), other.price);
         fieldSetFlags()[9] = true;
+      }
+      if (isValidValue(fields()[10], other.discretionaryOffset)) {
+        this.discretionaryOffset = data().deepCopy(fields()[10].schema(), other.discretionaryOffset);
+        fieldSetFlags()[10] = true;
+      }
+      if (isValidValue(fields()[11], other.quantity)) {
+        this.quantity = data().deepCopy(fields()[11].schema(), other.quantity);
+        fieldSetFlags()[11] = true;
       }
     }
 
@@ -740,6 +804,46 @@ static {
     }
 
     /**
+      * Gets the value of the 'msgType' field.
+      * @return The value.
+      */
+    public com.jtk.matching.api.gen.enums.MsgType getMsgType() {
+      return msgType;
+    }
+
+
+    /**
+      * Sets the value of the 'msgType' field.
+      * @param value The value of 'msgType'.
+      * @return This builder.
+      */
+    public com.jtk.matching.api.gen.Order.Builder setMsgType(com.jtk.matching.api.gen.enums.MsgType value) {
+      validate(fields()[6], value);
+      this.msgType = value;
+      fieldSetFlags()[6] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'msgType' field has been set.
+      * @return True if the 'msgType' field has been set, false otherwise.
+      */
+    public boolean hasMsgType() {
+      return fieldSetFlags()[6];
+    }
+
+
+    /**
+      * Clears the value of the 'msgType' field.
+      * @return This builder.
+      */
+    public com.jtk.matching.api.gen.Order.Builder clearMsgType() {
+      msgType = null;
+      fieldSetFlags()[6] = false;
+      return this;
+    }
+
+    /**
       * Gets the value of the 'orderCreation' field.
       * @return The value.
       */
@@ -754,9 +858,9 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder setOrderCreation(java.time.Instant value) {
-      validate(fields()[6], value);
+      validate(fields()[7], value);
       this.orderCreation = value.truncatedTo(java.time.temporal.ChronoUnit.MILLIS);
-      fieldSetFlags()[6] = true;
+      fieldSetFlags()[7] = true;
       return this;
     }
 
@@ -765,7 +869,7 @@ static {
       * @return True if the 'orderCreation' field has been set, false otherwise.
       */
     public boolean hasOrderCreation() {
-      return fieldSetFlags()[6];
+      return fieldSetFlags()[7];
     }
 
 
@@ -774,7 +878,7 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder clearOrderCreation() {
-      fieldSetFlags()[6] = false;
+      fieldSetFlags()[7] = false;
       return this;
     }
 
@@ -793,9 +897,9 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder setSubmitDate(java.time.LocalDate value) {
-      validate(fields()[7], value);
+      validate(fields()[8], value);
       this.submitDate = value;
-      fieldSetFlags()[7] = true;
+      fieldSetFlags()[8] = true;
       return this;
     }
 
@@ -804,7 +908,7 @@ static {
       * @return True if the 'submitDate' field has been set, false otherwise.
       */
     public boolean hasSubmitDate() {
-      return fieldSetFlags()[7];
+      return fieldSetFlags()[8];
     }
 
 
@@ -813,7 +917,7 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder clearSubmitDate() {
-      fieldSetFlags()[7] = false;
+      fieldSetFlags()[8] = false;
       return this;
     }
 
@@ -832,9 +936,9 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder setPrice(java.math.BigDecimal value) {
-      validate(fields()[8], value);
+      validate(fields()[9], value);
       this.price = value;
-      fieldSetFlags()[8] = true;
+      fieldSetFlags()[9] = true;
       return this;
     }
 
@@ -843,7 +947,7 @@ static {
       * @return True if the 'price' field has been set, false otherwise.
       */
     public boolean hasPrice() {
-      return fieldSetFlags()[8];
+      return fieldSetFlags()[9];
     }
 
 
@@ -853,7 +957,46 @@ static {
       */
     public com.jtk.matching.api.gen.Order.Builder clearPrice() {
       price = null;
-      fieldSetFlags()[8] = false;
+      fieldSetFlags()[9] = false;
+      return this;
+    }
+
+    /**
+      * Gets the value of the 'discretionaryOffset' field.
+      * @return The value.
+      */
+    public double getDiscretionaryOffset() {
+      return discretionaryOffset;
+    }
+
+
+    /**
+      * Sets the value of the 'discretionaryOffset' field.
+      * @param value The value of 'discretionaryOffset'.
+      * @return This builder.
+      */
+    public com.jtk.matching.api.gen.Order.Builder setDiscretionaryOffset(double value) {
+      validate(fields()[10], value);
+      this.discretionaryOffset = value;
+      fieldSetFlags()[10] = true;
+      return this;
+    }
+
+    /**
+      * Checks whether the 'discretionaryOffset' field has been set.
+      * @return True if the 'discretionaryOffset' field has been set, false otherwise.
+      */
+    public boolean hasDiscretionaryOffset() {
+      return fieldSetFlags()[10];
+    }
+
+
+    /**
+      * Clears the value of the 'discretionaryOffset' field.
+      * @return This builder.
+      */
+    public com.jtk.matching.api.gen.Order.Builder clearDiscretionaryOffset() {
+      fieldSetFlags()[10] = false;
       return this;
     }
 
@@ -872,9 +1015,9 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder setQuantity(long value) {
-      validate(fields()[9], value);
+      validate(fields()[11], value);
       this.quantity = value;
-      fieldSetFlags()[9] = true;
+      fieldSetFlags()[11] = true;
       return this;
     }
 
@@ -883,7 +1026,7 @@ static {
       * @return True if the 'quantity' field has been set, false otherwise.
       */
     public boolean hasQuantity() {
-      return fieldSetFlags()[9];
+      return fieldSetFlags()[11];
     }
 
 
@@ -892,7 +1035,7 @@ static {
       * @return This builder.
       */
     public com.jtk.matching.api.gen.Order.Builder clearQuantity() {
-      fieldSetFlags()[9] = false;
+      fieldSetFlags()[11] = false;
       return this;
     }
 
@@ -907,10 +1050,12 @@ static {
         record.productType = fieldSetFlags()[3] ? this.productType : (com.jtk.matching.api.gen.enums.ProductType) defaultValue(fields()[3]);
         record.priceType = fieldSetFlags()[4] ? this.priceType : (com.jtk.matching.api.gen.enums.PriceType) defaultValue(fields()[4]);
         record.side = fieldSetFlags()[5] ? this.side : (com.jtk.matching.api.gen.enums.Side) defaultValue(fields()[5]);
-        record.orderCreation = fieldSetFlags()[6] ? this.orderCreation : (java.time.Instant) defaultValue(fields()[6]);
-        record.submitDate = fieldSetFlags()[7] ? this.submitDate : (java.time.LocalDate) defaultValue(fields()[7]);
-        record.price = fieldSetFlags()[8] ? this.price : (java.math.BigDecimal) defaultValue(fields()[8]);
-        record.quantity = fieldSetFlags()[9] ? this.quantity : (java.lang.Long) defaultValue(fields()[9]);
+        record.msgType = fieldSetFlags()[6] ? this.msgType : (com.jtk.matching.api.gen.enums.MsgType) defaultValue(fields()[6]);
+        record.orderCreation = fieldSetFlags()[7] ? this.orderCreation : (java.time.Instant) defaultValue(fields()[7]);
+        record.submitDate = fieldSetFlags()[8] ? this.submitDate : (java.time.LocalDate) defaultValue(fields()[8]);
+        record.price = fieldSetFlags()[9] ? this.price : (java.math.BigDecimal) defaultValue(fields()[9]);
+        record.discretionaryOffset = fieldSetFlags()[10] ? this.discretionaryOffset : (java.lang.Double) defaultValue(fields()[10]);
+        record.quantity = fieldSetFlags()[11] ? this.quantity : (java.lang.Long) defaultValue(fields()[11]);
         return record;
       } catch (org.apache.avro.AvroMissingFieldException e) {
         throw e;

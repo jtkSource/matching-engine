@@ -13,4 +13,8 @@ protocol EnumProtocol{
   enum Side{
     Buy, Sell
   }
+  enum MsgType{
+    New, Amend, Cancel, IOI
+  }
+
 }

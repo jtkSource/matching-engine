@@ -13,7 +13,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.Iterator;
+import java.util.List;
 import java.util.UUID;
 
 import static com.jtk.matching.api.gen.enums.ProductType.Bond;
@@ -290,17 +292,81 @@ public class OrderBookTest {
 
     }
 
+    @Test
+    public void ask_order_within_discretionary_offset_must_trigger_negotiation(){
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createOrderBook(productId, pricetype);
+        List<OrderBook.OrderBookEntry> listOfNego = new ArrayList<>();
+        book.getNegotiationFlux().subscribe(listOfNego::add);
+
+        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+
+        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+
+        LOGGER.info("Before {}", book.printOrderBook());
+
+        double price = 99.35;
+        book.addOrder(createOrder(productId, price,1000,Side.Sell));
+
+        LOGGER.info("After {}", book.printOrderBook());
+
+        Assert.assertEquals("There should 2 orders to negotiate against but there is "+listOfNego.size(),
+                2, listOfNego.size());
+        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(0).getPrice().doubleValue() <= 0.01);
+        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(1).getPrice().doubleValue() <= 0.01);
+
+    }
+
+
+    @Test
+    public void bid_order_within_discretionary_offset_must_trigger_negotiation(){
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createOrderBook(productId, pricetype);
+        List<OrderBook.OrderBookEntry> listOfNego = new ArrayList<>();
+        book.getNegotiationFlux().subscribe(listOfNego::add);
+
+        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
+
+        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+
+        LOGGER.info("Before {}", book.printOrderBook());
+
+        double price = 100.00;
+        book.addOrder(createOrder(productId, price,1000,Side.Buy));
+
+        LOGGER.info("After {}", book.printOrderBook());
+
+        Assert.assertEquals("There should 1 orders to negotiate against but there is "+listOfNego.size(),
+                1, listOfNego.size());
+        Assert.assertTrue("Price is within DO of 0.01",listOfNego.get(0).getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
+    }
+
     private Order createOrder(String productId, double price, int quantity, Side side) {
         return Order.newBuilder()
                 .setOrderId(UUID.randomUUID().toString())
                 .setProductId(productId)
                 .setProductType(Bond)
                 .setOrderType(OrderType.LIMIT)
-                .setPrice(new BigDecimal(price))
+                .setPrice(new BigDecimal(String.valueOf(price)))
                 .setQuantity(quantity)
                 .setOrderCreation(Instant.now())
                 .setSubmitDate(LocalDate.now())
                 .setSide(side)
+                .setDiscretionaryOffset(0.01)
                 .build();
     }
 

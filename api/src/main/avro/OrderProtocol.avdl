@@ -6,13 +6,15 @@ protocol OrderProtocol{
   record Order {
     string orderId;
     string productId;
-    com.jtk.matching.api.gen.enums.OrderType orderType;
+    com.jtk.matching.api.gen.enums.OrderType orderType = "LIMIT";
     com.jtk.matching.api.gen.enums.ProductType productType;
     com.jtk.matching.api.gen.enums.PriceType priceType = "Cash";
     com.jtk.matching.api.gen.enums.Side side;
+    com.jtk.matching.api.gen.enums.MsgType msgType = "New";
     timestamp_ms orderCreation;
     date submitDate;
     @java-class("java.math.BigDecimal") string price;
+    double discretionaryOffset = 0.0;
     long quantity;
   }
 }

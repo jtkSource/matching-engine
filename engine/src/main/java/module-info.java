@@ -3,4 +3,5 @@ module com.jtk.matching.core {
     requires org.eclipse.collections.api;
     requires org.eclipse.collections.impl;
     requires com.jtk.matching.api;
+    requires reactor.core;
 }

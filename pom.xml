@@ -73,6 +73,11 @@
                 <artifactId>eclipse-collections</artifactId>
                 <version>10.0.0</version>
             </dependency>
+            <dependency>
+                <groupId>io.projectreactor</groupId>
+                <artifactId>reactor-core</artifactId>
+                <version>3.2.12.RELEASE</version>
+            </dependency>
         </dependencies>
     </dependencyManagement>
 
