@@ -20,6 +20,7 @@ import java.time.Instant;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
@@ -348,6 +349,10 @@ public class OrderBook {
                 ", priceType=" + priceType +
                 ", reverseOrder=" + reverseOrder +
                 '}';
+    }
+
+    public Pair<Optional<BigDecimal>, Optional<BigDecimal>> getTopLevel() {
+        return Tuples.pair(Optional.empty(),Optional.empty());
     }
 
     final class OrderBookEntry {

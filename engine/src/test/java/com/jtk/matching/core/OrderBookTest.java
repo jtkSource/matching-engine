@@ -14,10 +14,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 import static com.jtk.matching.api.gen.enums.ProductType.Bond;
 
@@ -286,6 +283,15 @@ public class OrderBookTest {
         Assert.assertEquals("There should 1 orders to negotiate against but there is " + listOfNego.size(),
                 1, listOfNego.size());
         Assert.assertTrue("Price is within DO of 0.01", listOfNego.get(0).getTwo().getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
+    }
+
+    @Test
+    public void getTopLevel_should_return_top_level_price_on_orderBook(){
+        OrderBook book = createTestOrderBook("XSS",createOrderBook("XSS",PriceType.Cash),99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+        Pair<Optional<BigDecimal>, Optional<BigDecimal>> topLevelPair = book.getTopLevel();
+        BigDecimal bidPrice = topLevelPair.getOne().orElse(BigDecimal.ZERO);
+        Assert.assertTrue("Top level Bid is 99.34 but is " + bidPrice.toPlainString(), bidPrice.toPlainString().equals("99.34000000"));
     }
 
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {
