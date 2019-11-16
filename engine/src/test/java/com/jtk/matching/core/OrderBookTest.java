@@ -9,12 +9,9 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import reactor.core.scheduler.Schedulers;
-import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -189,15 +186,8 @@ public class OrderBookTest {
     public void add_to_order_book_should_return_best_bid_and_best_ask_for_reversedorder() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Spread;
-        OrderBook book = createOrderBook(productId, pricetype, true);
-        book.addOrder(createOrder(productId, 5.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 5.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 4.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 4.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 4.03, 1000, Side.Sell));
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype, true), 5.01, 5.34, 5.03,
+                4.01, 4.34, 4.03);
 
         BigDecimal bestBid = book.getBestBid();
         BigDecimal bestAsk = book.getBestAsk();
@@ -252,7 +242,8 @@ public class OrderBookTest {
     public void ask_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
         final List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
         book.getNegotiationFluxProcessor().subscribe(listOfNego::add);
         double price = 99.35;
@@ -277,7 +268,8 @@ public class OrderBookTest {
     public void bid_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
         final List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
         book.getNegotiationFluxProcessor().subscribe(listOfNego::add);
         double price = 100.00;
@@ -291,9 +283,9 @@ public class OrderBookTest {
             Thread.sleep(1);
         }
 
-        Assert.assertEquals("There should 1 orders to negotiate against but there is "+listOfNego.size(),
+        Assert.assertEquals("There should 1 orders to negotiate against but there is " + listOfNego.size(),
                 1, listOfNego.size());
-        Assert.assertTrue("Price is within DO of 0.01",listOfNego.get(0).getTwo().getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
+        Assert.assertTrue("Price is within DO of 0.01", listOfNego.get(0).getTwo().getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
     }
 
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {
