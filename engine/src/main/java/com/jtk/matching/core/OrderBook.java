@@ -1,5 +1,6 @@
 package com.jtk.matching.core;
 
+import com.jtk.matching.api.gen.Execution;
 import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
@@ -48,8 +49,13 @@ public class OrderBook {
 
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
+
+    //Pair<bid,ask>
     private final EmitterProcessor<Pair<OrderBookEntry, OrderBookEntry>> negoProcessor;
-    private final EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelProcessor;
+    //Pair<bid,ask>
+    private final EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelPriceProcessor;
+
+    private final EmitterProcessor<Execution> executionProcessor;
 
     volatile private AtomicReference<BigDecimal> bestAsk = new AtomicReference(BigDecimal.ZERO);
 
@@ -71,7 +77,8 @@ public class OrderBook {
             this.askSet = TreeSortedSet.newSet(descPriceTimeComparator);
         }
         negoProcessor = EmitterProcessor.create();
-        topLevelProcessor = EmitterProcessor.create();
+        topLevelPriceProcessor = EmitterProcessor.create();
+        executionProcessor = EmitterProcessor.create();
     }
 
     public String getProductId() {
@@ -98,8 +105,18 @@ public class OrderBook {
      *
      * @return
      */
-    public EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> getTopLevelSource() {
-        return topLevelProcessor;
+    public EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> getTopLevelPriceSource() {
+        return topLevelPriceProcessor;
+    }
+
+    /**
+     * Subscribing to the FluxProcessor returned by this method will tap into executions generated when order is added to
+     * order book
+     *
+     * @return
+     */
+    public EmitterProcessor<Execution> getExecutionProcessor() {
+        return executionProcessor;
     }
 
     //TODO: validations - price cant be negative, MKT prices to be supported, handling order quantity amends, handling order price amends
@@ -113,10 +130,10 @@ public class OrderBook {
             addSellOrder(orderEntry);
         }
 
-        Mono.just(Tuples.pair(Optional.ofNullable(bestBid.get()), Optional.ofNullable(bestAsk.get())))
+        Mono.just(Tuples.pair(Optional.ofNullable(getBestBid()), Optional.ofNullable(getBestAsk())))
                 .publishOn(Schedulers.newSingle("top-level-source"))
                 .log("orderbook.marketdata.", Level.FINE)
-                .subscribe(topLevelProcessor::onNext);
+                .subscribe(topLevelPriceProcessor::onNext);
         Flux.fromIterable(findOrdersWithinDO(orderEntry))
                 .publishOn(Schedulers.newSingle("nego-source"))
                 .log("orderbook.nego.", Level.FINE)
@@ -131,11 +148,11 @@ public class OrderBook {
         return bestBid.get();
     }
 
-    static OrderBook getInstance(String productId, PriceType priceType) {
+    public static OrderBook getInstance(String productId, PriceType priceType) {
         return new OrderBook(productId, priceType, false);
     }
 
-    static OrderBook getInstance(String productId, PriceType priceType, boolean reverseOrder) {
+    public static OrderBook getInstance(String productId, PriceType priceType, boolean reverseOrder) {
         return new OrderBook(productId, priceType, reverseOrder);
     }
 
@@ -284,7 +301,8 @@ public class OrderBook {
                 if (askEntry.getQuantity() <= remainingQuantity) {
                     if (askSet.remove(askEntry)) {
                         long executedQuantity = askEntry.getQuantity();
-                        createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                        createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), Side.Buy);
+                        createExecution(executedQuantity, bidEntry.getPrice(), askEntry.getOrderId(), Side.Sell);
                         remainingQuantity = bidEntry.getQuantity() - executedQuantity;
                         updateBestAsk();
                     }
@@ -292,7 +310,9 @@ public class OrderBook {
                     long executedQuantity = askEntry.getQuantity() - bidEntry.getQuantity();
                     remainingQuantity = 0;
                     askEntry.quantity = executedQuantity;
-                    createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                    createExecution(executedQuantity, bidEntry.getPrice(), bidEntry.getOrderId(), Side.Buy);
+                    createExecution(executedQuantity, bidEntry.getPrice(), askEntry.getOrderId(), Side.Sell);
+
                 }
                 if (remainingQuantity <= 0 || !isBidMatching(bidEntry))
                     break;
@@ -316,7 +336,8 @@ public class OrderBook {
                 if (bidEntry.getQuantity() <= remainingQuantity) {
                     if (bidSet.remove(bidEntry)) {
                         long executedQuantity = bidEntry.getQuantity();
-                        createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                        createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), Side.Buy);
+                        createExecution(executedQuantity, askEntry.getPrice(), askEntry.getOrderId(), Side.Sell);
                         remainingQuantity = askEntry.getQuantity() - executedQuantity;
                         updateBestBid();
                     }
@@ -324,7 +345,9 @@ public class OrderBook {
                     long executedQuantity = bidEntry.getQuantity() - askEntry.getQuantity();
                     remainingQuantity = 0;
                     bidEntry.quantity = executedQuantity;
-                    createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), askEntry.getOrderId(), Instant.now());
+                    createExecution(executedQuantity, askEntry.getPrice(), bidEntry.getOrderId(), Side.Buy);
+                    createExecution(executedQuantity, askEntry.getPrice(), askEntry.getOrderId(), Side.Sell);
+
                 }
                 if (remainingQuantity <= 0 || !isAskMatching(askEntry))
                     break;
@@ -337,9 +360,17 @@ public class OrderBook {
         }
     }
 
-    private void createExecution(long executedQuantity, BigDecimal executedPrice, String bidOrderId, String askOrderId, Instant now) {
-        LOGGER.info("Execution created executedQuantity: {}, executedPrice {} @{}", executedQuantity, executedPrice, now);
-        //TODO: Publish executions to external consumer
+    private void createExecution(long executedQuantity, BigDecimal executedPrice, String bidOrderId, Side side) {
+        Mono.just(Execution.newBuilder()
+                .setExecCreation(Instant.now())
+                .setExecutedQuantity(executedQuantity)
+                .setExecutedPrice(executedPrice)
+                .setOrderId(bidOrderId)
+                .setSide(side)
+                .build())
+                .publishOn(Schedulers.newSingle("execution-source"))
+                .log("orderbook.execution.", Level.FINE)
+                .subscribe(executionProcessor::onNext);
     }
 
     private boolean isAskMatching(OrderBookEntry newAsk) {

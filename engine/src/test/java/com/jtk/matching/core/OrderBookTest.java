@@ -1,5 +1,6 @@
 package com.jtk.matching.core;
 
+import com.jtk.matching.api.gen.Execution;
 import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.OrderType;
 import com.jtk.matching.api.gen.enums.PriceType;
@@ -201,10 +202,13 @@ public class OrderBookTest {
     @Test
     public void add_matching_bid_to_order_book_should_result_in_removing_top_level_on_ask_and_bid_is_partially_executed_at_five_hundered() {
         String productId = "XSS";
+
         PriceType pricetype = PriceType.Cash;
+
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
 
         Order matchingBid = createOrder(productId, 100.01, 1500, Side.Buy);
+
         book.addOrder(matchingBid);
 
         LOGGER.info("After Execution {}", book.printOrderBook());
@@ -214,7 +218,91 @@ public class OrderBookTest {
         Assert.assertEquals("best bid Quantity should be 500", 500, book.getBids().getFirst().getQuantity());
 
         String orderId = book.getBids().getFirst().getOrderId();
+
         Assert.assertEquals("The remaining best bid should be at top level but it is " + orderId, matchingBid.getOrderId(), orderId);
+    }
+
+    @Test
+    public void add_matching_bid_should_create_two_executions() throws InterruptedException {
+
+        String productId = "XSS";
+
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+
+        List<Execution> executionList = new ArrayList<>();
+
+        book.getExecutionProcessor().subscribe(executionList::add);
+
+        Order matchingBid = createOrder(productId, 100.01, 1500, Side.Buy);
+
+        book.addOrder(matchingBid);
+
+        int count = 0;
+
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+
+        LOGGER.info("After Execution {}", book.printOrderBook());
+        Assert.assertEquals("There should be two executions created ", 2, executionList.size());
+        Assert.assertTrue("Buy side Execution OrderId should be " + matchingBid.getOrderId(), executionList.stream()
+                .filter(p -> p.getSide().equals(Side.Buy))
+                .filter(p -> p.getOrderId().equals(matchingBid.getOrderId()))
+                .count() == 1
+        );
+        Assert.assertTrue("Executions are at 100.01",
+                executionList.get(0).getExecutedPrice().equals(executionList.get(1).getExecutedPrice()) &&
+                        executionList.get(0).getExecutedPrice().toPlainString().equals("100.01000000")
+        );
+
+    }
+
+    @Test
+    public void add_matching_bid_should_create_four_executions() throws InterruptedException {
+
+        String productId = "XSS";
+
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+
+        List<Execution> executionList = new ArrayList<>();
+
+        book.getExecutionProcessor().subscribe(executionList::add);
+
+        Order matchingBid = createOrder(productId, 100.04, 1500, Side.Buy);
+
+        Assert.assertTrue("Final Best Ask should be 100.01000000", book.getBestAsk().toPlainString().equals("100.01000000"));
+        Assert.assertTrue("Top level quantity is 1000 ", book.getAsks().getFirst().getQuantity() == 1000);
+
+        book.addOrder(matchingBid);
+
+        int count = 0;
+
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+
+        LOGGER.info("After Execution {}", book.printOrderBook());
+        Assert.assertEquals("There should be four executions created ", 4, executionList.size());
+        Assert.assertTrue("Buy side Execution OrderId should be " + matchingBid.getOrderId(), executionList.stream()
+                .filter(p -> p.getSide().equals(Side.Buy))
+                .filter(p -> p.getOrderId().equals(matchingBid.getOrderId()))
+                .count() == 2
+        );
+        Assert.assertTrue("All executions created at 100.04000000", executionList.stream()
+                .filter(p -> p.getExecutedPrice().toPlainString().equals("100.04000000"))
+                .count() == 4
+        );
+        Assert.assertTrue("Final Best Bid should be 100.03000000", book.getAsks().getFirst().getPrice().toPlainString().equals("100.03000000"));
+
+        Assert.assertTrue("Top level Bid quantity is 500 ", book.getAsks().getFirst().getQuantity() == 500);
+
+
     }
 
     @Test
@@ -238,6 +326,51 @@ public class OrderBookTest {
         Assert.assertNotEquals("The top level ask should be the same but is " + orderId, matchingAsk.getOrderId(), orderId);
 
     }
+
+    @Test
+    public void add_matching_ask_should_create_four_executions() throws InterruptedException {
+
+        String productId = "XSS";
+
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+
+        List<Execution> executionList = new ArrayList<>();
+
+        book.getExecutionProcessor().subscribe(executionList::add);
+
+        Order matchingAsk = createOrder(productId, 99.33, 1500, Side.Sell);
+
+        Assert.assertTrue("Final Best Bid should be 99.34000000", book.getBestBid().toPlainString().equals("99.34000000"));
+        Assert.assertTrue("Top level quantity is 1000 ", book.getBids().getFirst().getQuantity() == 1000);
+
+        book.addOrder(matchingAsk);
+
+        int count = 0;
+
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+
+        LOGGER.info("After Execution {}", book.printOrderBook());
+        LOGGER.info("Executions {}", executionList);
+        Assert.assertEquals("There should be four executions created ", 4, executionList.size());
+        Assert.assertTrue("All sell side executions have same orderId", executionList.stream()
+                .filter(p -> p.getSide() == Side.Sell)
+                .filter(p -> p.getOrderId().equals(matchingAsk.getOrderId()))
+                .count() == 2
+        );
+        Assert.assertTrue("All executions created at 99.33000000", executionList.stream()
+                .filter(p -> p.getExecutedPrice().toPlainString().equals("99.33000000"))
+                .count() == 4
+        );
+        Assert.assertTrue("Final Best Bid should be 99.34000000", book.getBestBid().toPlainString().equals("99.34000000"));
+
+        Assert.assertTrue("Top level Bid quantity is 500 ", book.getBids().getFirst().getQuantity() == 500);
+    }
+
 
     @Test
     public void ask_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
@@ -296,7 +429,7 @@ public class OrderBookTest {
 
         List<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelList = new ArrayList<>();
 
-        book.getTopLevelSource().subscribe(topLevelList::add);
+        book.getTopLevelPriceSource().subscribe(topLevelList::add);
 
         createTestOrderBook("XSS", book, 99.01, 99.34, 99.03,
                 100.34, 100.03, 100.01);
@@ -338,7 +471,7 @@ public class OrderBookTest {
 
         List<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelList = new ArrayList<>();
 
-        book.getTopLevelSource().subscribe(topLevelList::add);
+        book.getTopLevelPriceSource().subscribe(topLevelList::add);
 
         int count = 0;
 

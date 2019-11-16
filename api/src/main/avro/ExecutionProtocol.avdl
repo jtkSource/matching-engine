@@ -1,0 +1,12 @@
+@namespace("com.jtk.matching.api.gen")
+
+protocol ExecutionProtocol{
+  import idl "EnumProtocols.avdl";
+  record Execution {
+	string orderId;
+	timestamp_ms execCreation;
+	@java-class("java.math.BigDecimal") string executedPrice;
+	long executedQuantity;
+	com.jtk.matching.api.gen.enums.Side side;
+  }
+}
