@@ -14,7 +14,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
 
 import static com.jtk.matching.api.gen.enums.ProductType.Bond;
 
@@ -242,7 +246,7 @@ public class OrderBookTest {
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
                 100.01, 100.34, 100.03);
         final List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
-        book.getNegotiationFluxProcessor().subscribe(listOfNego::add);
+        book.getNegotiationSource().subscribe(listOfNego::add);
         double price = 99.35;
         book.addOrder(createOrder(productId, price, 1000, Side.Sell));
 
@@ -268,7 +272,7 @@ public class OrderBookTest {
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
                 100.01, 100.34, 100.03);
         final List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
-        book.getNegotiationFluxProcessor().subscribe(listOfNego::add);
+        book.getNegotiationSource().subscribe(listOfNego::add);
         double price = 100.00;
         book.addOrder(createOrder(productId, price, 1000, Side.Buy));
 
@@ -286,12 +290,46 @@ public class OrderBookTest {
     }
 
     @Test
-    public void getTopLevel_should_return_top_level_price_on_orderBook(){
-        OrderBook book = createTestOrderBook("XSS",createOrderBook("XSS",PriceType.Cash),99.01, 99.34, 99.03,
-                100.01, 100.34, 100.03);
-        Pair<Optional<BigDecimal>, Optional<BigDecimal>> topLevelPair = book.getTopLevel();
-        BigDecimal bidPrice = topLevelPair.getOne().orElse(BigDecimal.ZERO);
-        Assert.assertTrue("Top level Bid is 99.34 but is " + bidPrice.toPlainString(), bidPrice.toPlainString().equals("99.34000000"));
+    public void top_level_subscription_should_stream_top_level_prices_in_order_of_order_entry() throws InterruptedException {
+
+        OrderBook book = createOrderBook("XSS", PriceType.Cash);
+
+        List<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelList = new ArrayList<>();
+
+        book.getTopLevelSource().subscribe(topLevelList::add);
+
+        createTestOrderBook("XSS", book, 99.01, 99.34, 99.03,
+                100.34, 100.03, 100.01);
+
+        int count = 0;
+
+        while (topLevelList.size() < 3 || count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+        Assert.assertEquals("There should be 8 top-level market data published ", 8, topLevelList.size());
+
+        Assert.assertTrue("Second Bid should replace the first bid in top level",
+                topLevelList.get(0).getOne().get().compareTo(topLevelList.get(1).getOne().get()) != 0);
+
+        List<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> bidList = topLevelList.subList(1, topLevelList.size());
+        BigDecimal bestBid = topLevelList.get(topLevelList.size() - 1).getOne().orElse(BigDecimal.ZERO);
+        int bids = (int) topLevelList.stream()
+                .filter(p -> p.getOne().orElse(BigDecimal.ZERO).equals(bestBid))
+                .count();
+        Assert.assertTrue("Second Bid is best Bid ", bids == bidList.size());
+
+        BigDecimal bestAsk = topLevelList.get(topLevelList.size() - 1).getTwo().orElse(BigDecimal.ZERO);
+
+        int totalBestAsksCount = (int) topLevelList.stream()
+                .filter(p -> p.getTwo().orElse(BigDecimal.ZERO).equals(bestAsk))
+                .count();
+
+        List<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> askList = topLevelList.subList(topLevelList.size() - 2,
+                topLevelList.size());
+
+        Assert.assertTrue("Last two asks are best ask Bid ", totalBestAsksCount == askList.size());
+
     }
 
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {

@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.publisher.EmitterProcessor;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 
 import java.math.BigDecimal;
@@ -30,7 +31,7 @@ public class OrderBook {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(OrderBook.class);
 
-    private final static int PRICE_SCALE = 8; // should be set fron system property
+    private final static int PRICE_SCALE = 8; // should be set from system property
 
     private final String productId;
 
@@ -48,6 +49,7 @@ public class OrderBook {
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
     private final EmitterProcessor<Pair<OrderBookEntry, OrderBookEntry>> negoProcessor;
+    private final EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelProcessor;
 
     volatile private AtomicReference<BigDecimal> bestAsk = new AtomicReference(BigDecimal.ZERO);
 
@@ -69,23 +71,8 @@ public class OrderBook {
             this.askSet = TreeSortedSet.newSet(descPriceTimeComparator);
         }
         negoProcessor = EmitterProcessor.create();
+        topLevelProcessor = EmitterProcessor.create();
     }
-
-    /**
-     * not singleton
-     *
-     * @param productId
-     * @param priceType
-     * @return
-     */
-    static OrderBook getInstance(String productId, PriceType priceType) {
-        return new OrderBook(productId, priceType, false);
-    }
-
-    static OrderBook getInstance(String productId, PriceType priceType, boolean reverseOrder) {
-        return new OrderBook(productId, priceType, reverseOrder);
-    }
-
 
     public String getProductId() {
         return this.productId;
@@ -95,8 +82,24 @@ public class OrderBook {
         return this.priceType;
     }
 
-    public EmitterProcessor<Pair<OrderBookEntry, OrderBookEntry>> getNegotiationFluxProcessor() {
+    /**
+     * Subscribing to the FluxProcessor returned by this method will tap into orders that fall within a configured
+     * discretionary offset when added to the order book.
+     *
+     * @return
+     */
+    public EmitterProcessor<Pair<OrderBookEntry, OrderBookEntry>> getNegotiationSource() {
         return negoProcessor;
+    }
+
+    /**
+     * Subscribing to the FluxProcessor returned by this method will tap into top-level prices when order is added to
+     * order book
+     *
+     * @return
+     */
+    public EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> getTopLevelSource() {
+        return topLevelProcessor;
     }
 
     //TODO: validations - price cant be negative, MKT prices to be supported, handling order quantity amends, handling order price amends
@@ -109,10 +112,74 @@ public class OrderBook {
         } else {
             addSellOrder(orderEntry);
         }
+
+        Mono.just(Tuples.pair(Optional.ofNullable(bestBid.get()), Optional.ofNullable(bestAsk.get())))
+                .publishOn(Schedulers.newSingle("top-level-source"))
+                .log("orderbook.marketdata.", Level.FINE)
+                .subscribe(topLevelProcessor::onNext);
         Flux.fromIterable(findOrdersWithinDO(orderEntry))
                 .publishOn(Schedulers.newSingle("nego-source"))
-                .log("reactor.", Level.FINE)
+                .log("orderbook.nego.", Level.FINE)
                 .subscribe(negoProcessor::onNext);
+    }
+
+    public BigDecimal getBestAsk() {
+        return bestAsk.get();
+    }
+
+    public BigDecimal getBestBid() {
+        return bestBid.get();
+    }
+
+    static OrderBook getInstance(String productId, PriceType priceType) {
+        return new OrderBook(productId, priceType, false);
+    }
+
+    static OrderBook getInstance(String productId, PriceType priceType, boolean reverseOrder) {
+        return new OrderBook(productId, priceType, reverseOrder);
+    }
+
+    MutableSortedSet<OrderBookEntry> getBids() {
+        return bidSet.asUnmodifiable();
+    }
+
+    MutableSortedSet<OrderBookEntry> getAsks() {
+        return askSet.asUnmodifiable();
+    }
+
+    String printOrderBook() {
+        MutableList<Pair<String, String>> bidPrices = getBids().collect(orderBookEntry -> Tuples.pair(orderBookEntry.getPrice().toPlainString(), String.valueOf(orderBookEntry.getQuantity())));
+        MutableList<Pair<String, String>> askPrices = getAsks().collect(orderBookEntry -> Tuples.pair(orderBookEntry.getPrice().toPlainString(), String.valueOf(orderBookEntry.getQuantity())));
+        int minIndex = Math.min(bidPrices.size(), askPrices.size());
+        StringBuilder builder = new StringBuilder();
+        builder.append(this.toString());
+        builder.append("\n")
+                .append(String.format("%10s | %20s | %-20s | %10s%n", "QTY", "BID", "ASK", "QTY"))
+                .append(String.format("%10s | %20s | %-20s | %10s%n", "----------", "-------------------", "-------------------", "----------"));
+        for (int i = 0; i < minIndex; i++) {
+            builder.append(String.format("%10s | %20s | %-20s | %10s%n", bidPrices.get(i).getTwo(), bidPrices.get(i).getOne(), askPrices.get(i).getOne(), askPrices.get(i).getTwo()));
+        }
+        if (bidPrices.size() < askPrices.size()) {
+            for (int i = minIndex; i < askPrices.size(); i++) {
+                builder.append(String.format("%10s | %20s | %-20s | %10s%n", "", "", askPrices.get(i).getOne(), askPrices.get(i).getTwo()));
+            }
+        }
+
+        if (bidPrices.size() > askPrices.size()) {
+            for (int i = minIndex; i < bidPrices.size(); i++) {
+                builder.append(String.format("%10s | %20s | %-20s | %10s%n", bidPrices.get(i).getTwo(), bidPrices.get(i).getOne(), "", ""));
+            }
+        }
+        return builder.toString();
+    }
+
+    @Override
+    public String toString() {
+        return "OrderBook{" +
+                "productId='" + productId + '\'' +
+                ", priceType=" + priceType +
+                ", reverseOrder=" + reverseOrder +
+                '}';
     }
 
     private List<Pair<OrderBookEntry, OrderBookEntry>> findOrdersWithinDO(OrderBookEntry orderBookEntry) {
@@ -299,62 +366,6 @@ public class OrderBook {
         bestAsk.set(askSet.getFirst().price);
     }
 
-    public BigDecimal getBestAsk() {
-        return bestAsk.get();
-    }
-
-    public BigDecimal getBestBid() {
-        return bestBid.get();
-    }
-
-    MutableSortedSet<OrderBookEntry> getBids() {
-        return bidSet.asUnmodifiable();
-    }
-
-    MutableSortedSet<OrderBookEntry> getAsks() {
-        return askSet.asUnmodifiable();
-    }
-
-
-    public String printOrderBook() {
-        MutableList<Pair<String, String>> bidPrices = getBids().collect(orderBookEntry -> Tuples.pair(orderBookEntry.getPrice().toPlainString(), String.valueOf(orderBookEntry.getQuantity())));
-        MutableList<Pair<String, String>> askPrices = getAsks().collect(orderBookEntry -> Tuples.pair(orderBookEntry.getPrice().toPlainString(), String.valueOf(orderBookEntry.getQuantity())));
-        int minIndex = Math.min(bidPrices.size(), askPrices.size());
-        StringBuilder builder = new StringBuilder();
-        builder.append(this.toString());
-        builder.append("\n")
-                .append(String.format("%10s | %20s | %-20s | %10s%n", "QTY", "BID", "ASK", "QTY"))
-                .append(String.format("%10s | %20s | %-20s | %10s%n", "----------", "-------------------", "-------------------", "----------"));
-        for (int i = 0; i < minIndex; i++) {
-            builder.append(String.format("%10s | %20s | %-20s | %10s%n", bidPrices.get(i).getTwo(), bidPrices.get(i).getOne(), askPrices.get(i).getOne(), askPrices.get(i).getTwo()));
-        }
-        if (bidPrices.size() < askPrices.size()) {
-            for (int i = minIndex; i < askPrices.size(); i++) {
-                builder.append(String.format("%10s | %20s | %-20s | %10s%n", "", "", askPrices.get(i).getOne(), askPrices.get(i).getTwo()));
-            }
-        }
-
-        if (bidPrices.size() > askPrices.size()) {
-            for (int i = minIndex; i < bidPrices.size(); i++) {
-                builder.append(String.format("%10s | %20s | %-20s | %10s%n", bidPrices.get(i).getTwo(), bidPrices.get(i).getOne(), "", ""));
-            }
-        }
-        return builder.toString();
-    }
-
-    @Override
-    public String toString() {
-        return "OrderBook{" +
-                "productId='" + productId + '\'' +
-                ", priceType=" + priceType +
-                ", reverseOrder=" + reverseOrder +
-                '}';
-    }
-
-    public Pair<Optional<BigDecimal>, Optional<BigDecimal>> getTopLevel() {
-        return Tuples.pair(Optional.empty(),Optional.empty());
-    }
-
     final class OrderBookEntry {
         private final CharSequence orderId;
         private final BigDecimal price;
@@ -421,4 +432,5 @@ public class OrderBook {
                     '}';
         }
     }
+
 }
