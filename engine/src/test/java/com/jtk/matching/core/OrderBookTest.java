@@ -10,16 +10,17 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import reactor.core.scheduler.Schedulers;
+import reactor.test.StepVerifier;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.Executors;
 
 import static com.jtk.matching.api.gen.enums.ProductType.Bond;
 
@@ -62,16 +63,7 @@ public class OrderBookTest {
     public void add_to_order_book_should_sort_bid_from_hi_to_low_price_and_ask_from_low_to_hi_and_long_to_short_time() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
 
         LOGGER.info("Bid Orders {}", book.getBids().makeString("\n"));
         Assert.assertTrue("There should be three buy orders", book.getBids().size() == 4);
@@ -136,16 +128,7 @@ public class OrderBookTest {
     public void reverse_order_book_sorting_should_sort_bid_price_from_lo_to_hi_and_ask_price_from_hi_to_lo_and_long_to_short_time() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Spread;
-        OrderBook book = createOrderBook(productId, pricetype, true);
-        book.addOrder(createOrder(productId, 5.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 5.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 5.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 4.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 4.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 4.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 4.34, 1000, Side.Sell));
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype, true), 5.01, 5.34, 5.03, 4.01, 4.34, 4.03);
 
         LOGGER.info("Bid Orders {}", book.getBids().makeString("\n"));
         Assert.assertTrue("There should be three buy orders", book.getBids().size() == 4);
@@ -193,16 +176,7 @@ public class OrderBookTest {
     public void add_to_order_book_should_return_best_bid_and_best_ask() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
 
         BigDecimal bestBid = book.getBestBid();
         BigDecimal bestAsk = book.getBestAsk();
@@ -237,18 +211,7 @@ public class OrderBookTest {
     public void add_matching_bid_to_order_book_should_result_in_removing_top_level_on_ask_and_bid_is_partially_executed_at_five_hundered() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-
-        LOGGER.info("Before Execution {}", book.printOrderBook());
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
 
         Order matchingBid = createOrder(productId, 100.01, 1500, Side.Buy);
         book.addOrder(matchingBid);
@@ -267,18 +230,7 @@ public class OrderBookTest {
     public void add_matching_ask_to_order_book_should_result_in_removing_first_bid_level_and_reducing_the_second_bidlevel_and_ask_is_fully_executed() {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-
-        LOGGER.info("Before Execution {}", book.printOrderBook());
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
 
         Order matchingAsk = createOrder(productId, 99.34, 1500, Side.Sell);
 
@@ -297,71 +249,69 @@ public class OrderBookTest {
     }
 
     @Test
-    public void ask_order_within_discretionary_offset_must_trigger_negotiation(){
+    public void ask_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
-        book.getNegotiationFlux()
-                .subscribe(orderBookEntry -> {
-                    LOGGER.info("Received new negotiation");
-                    listOfNego.add(orderBookEntry);
-                }
-        );
-
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-
-        LOGGER.info("Before {}", book.printOrderBook());
-
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+        final List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
+        book.getNegotiationFluxProcessor().subscribe(listOfNego::add);
         double price = 99.35;
-        book.addOrder(createOrder(productId, price,1000,Side.Sell));
+        book.addOrder(createOrder(productId, price, 1000, Side.Sell));
 
         LOGGER.info("After {}", book.printOrderBook());
+        int count = 0;
+        while (listOfNego.size() < 2 || count < 3) {
+            count++;
+            Thread.sleep(1); // visibility to
+        }
 
-        Assert.assertEquals("There should 2 orders to negotiate against but there is "+listOfNego.size(),
+        Assert.assertEquals("There should 2 orders to negotiate against but there is " + listOfNego.size(),
                 2, listOfNego.size());
-        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(0).getTwo().getPrice().doubleValue() <= 0.01);
-        Assert.assertTrue("Price is within DO of 0.01",price - listOfNego.get(1).getTwo().getPrice().doubleValue() <= 0.01);
+        Assert.assertTrue("Price is within DO of 0.01", price - listOfNego.get(0).getTwo().getPrice().doubleValue() <= 0.01);
+        Assert.assertTrue("Price is within DO of 0.01", price - listOfNego.get(1).getTwo().getPrice().doubleValue() <= 0.01);
 
     }
 
 
     @Test
-    public void bid_order_within_discretionary_offset_must_trigger_negotiation(){
+    public void bid_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
-        OrderBook book = createOrderBook(productId, pricetype);
-        List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
-        book.getNegotiationFlux().subscribe(listOfNego::add);
-
-        book.addOrder(createOrder(productId, 99.01, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.03, 1000, Side.Buy));
-        book.addOrder(createOrder(productId, 99.34, 1000, Side.Buy));
-
-        book.addOrder(createOrder(productId, 100.01, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.03, 1000, Side.Sell));
-        book.addOrder(createOrder(productId, 100.34, 1000, Side.Sell));
-
-        LOGGER.info("Before {}", book.printOrderBook());
-
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
+        final List<Pair<OrderBook.OrderBookEntry, OrderBook.OrderBookEntry>> listOfNego = new ArrayList<>();
+        book.getNegotiationFluxProcessor().subscribe(listOfNego::add);
         double price = 100.00;
-        book.addOrder(createOrder(productId, price,1000,Side.Buy));
+        book.addOrder(createOrder(productId, price, 1000, Side.Buy));
 
         LOGGER.info("After {}", book.printOrderBook());
+
+        int count = 0;
+        while (listOfNego.size() < 1 || count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
 
         Assert.assertEquals("There should 1 orders to negotiate against but there is "+listOfNego.size(),
                 1, listOfNego.size());
         Assert.assertTrue("Price is within DO of 0.01",listOfNego.get(0).getTwo().getPrice().subtract(BigDecimal.valueOf(price)).toString().startsWith("0.01"));
+    }
+
+    private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {
+        OrderBook book = orderBook;
+
+        book.addOrder(createOrder(productId, bid1, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, bid2, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, bid3, 1000, Side.Buy));
+        book.addOrder(createOrder(productId, bid2, 1000, Side.Buy));
+
+        book.addOrder(createOrder(productId, ask1, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, ask2, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, ask3, 1000, Side.Sell));
+        book.addOrder(createOrder(productId, ask2, 1000, Side.Sell));
+
+
+        LOGGER.info("Before {}", book.printOrderBook());
+        return book;
     }
 
     private Order createOrder(String productId, double price, int quantity, Side side) {
