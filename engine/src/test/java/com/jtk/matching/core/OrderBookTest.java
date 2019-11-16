@@ -252,7 +252,7 @@ public class OrderBookTest {
 
         LOGGER.info("After {}", book.printOrderBook());
         int count = 0;
-        while (listOfNego.size() < 2 || count < 3) {
+        while (listOfNego.size() < 2 && count < 3) {
             count++;
             Thread.sleep(1); // visibility to
         }
@@ -279,7 +279,7 @@ public class OrderBookTest {
         LOGGER.info("After {}", book.printOrderBook());
 
         int count = 0;
-        while (listOfNego.size() < 1 || count < 3) {
+        while (listOfNego.size() < 1 && count < 3) {
             count++;
             Thread.sleep(1);
         }
@@ -303,7 +303,7 @@ public class OrderBookTest {
 
         int count = 0;
 
-        while (topLevelList.size() < 3 || count < 3) {
+        while (topLevelList.size() < 3 && count < 3) {
             count++;
             Thread.sleep(1);
         }
@@ -329,6 +329,24 @@ public class OrderBookTest {
                 topLevelList.size());
 
         Assert.assertTrue("Last two asks are best ask Bid ", totalBestAsksCount == askList.size());
+
+    }
+
+    @Test
+    public void top_level_subscription_should_stream_no_levels_when_there_is_no_orders() throws InterruptedException {
+        OrderBook book = createOrderBook("XSS", PriceType.Cash);
+
+        List<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelList = new ArrayList<>();
+
+        book.getTopLevelSource().subscribe(topLevelList::add);
+
+        int count = 0;
+
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+        Assert.assertEquals("There should be 0 top-level market data published ", 0, topLevelList.size());
 
     }
 
