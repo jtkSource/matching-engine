@@ -9,7 +9,9 @@ import com.jtk.matching.api.gen.enums.PriceType;
 import static com.jtk.matching.api.gen.enums.ProductType.Bond;
 import com.jtk.matching.api.gen.enums.Side;
 import com.jtk.matching.core.exp.ValidationException;
+import org.eclipse.collections.api.list.MutableList;
 import org.eclipse.collections.api.tuple.Pair;
+import org.eclipse.collections.impl.factory.Lists;
 import org.junit.Assert;
 import org.junit.Rule;
 import org.junit.Test;
@@ -112,7 +114,7 @@ public class OrderBookTest {
             }
         }
 
-        LOGGER.info("Print Book {}", book.printOrderBook());
+        LOGGER.info("Print Book {}", book.printLimitOrderBook());
 
     }
 
@@ -177,7 +179,7 @@ public class OrderBookTest {
                 prev = oe;
             }
         }
-        LOGGER.info("Print Book: {}", book.printOrderBook());
+        LOGGER.info("Print Book: {}", book.printLimitOrderBook());
 
     }
 
@@ -220,7 +222,7 @@ public class OrderBookTest {
 
         book.addOrder(matchingBid);
 
-        LOGGER.info("After Execution {}", book.printOrderBook());
+        LOGGER.info("After Execution {}", book.printLimitOrderBook());
 
         Assert.assertEquals("ask top level should be 3", 3, book.getAsks().size());
 
@@ -255,7 +257,7 @@ public class OrderBookTest {
             Thread.sleep(1);
         }
 
-        LOGGER.info("After Execution {}", book.printOrderBook());
+        LOGGER.info("After Execution {}", book.printLimitOrderBook());
         Assert.assertEquals("There should be two executions created ", 2, executionList.size());
         Assert.assertTrue("Buy side Execution OrderId should be " + matchingBid.getOrderId(), executionList.stream()
                 .filter(p -> p.getSide().equals(Side.Buy))
@@ -296,7 +298,7 @@ public class OrderBookTest {
             Thread.sleep(1);
         }
 
-        LOGGER.info("After Execution {}", book.printOrderBook());
+        LOGGER.info("After Execution {}", book.printLimitOrderBook());
         Assert.assertEquals("There should be four executions created ", 4, executionList.size());
         Assert.assertTrue("Buy side Execution OrderId should be " + matchingBid.getOrderId(), executionList.stream()
                 .filter(p -> p.getSide().equals(Side.Buy))
@@ -322,7 +324,7 @@ public class OrderBookTest {
 
         book.addOrder(matchingAsk);
 
-        LOGGER.info("After Execution {}", book.printOrderBook());
+        LOGGER.info("After Execution {}", book.printLimitOrderBook());
 
         Assert.assertEquals("bid top level should be 3", 3, book.getBids().size());
 
@@ -361,7 +363,7 @@ public class OrderBookTest {
             Thread.sleep(1);
         }
 
-        LOGGER.info("After Execution {}", book.printOrderBook());
+        LOGGER.info("After Execution {}", book.printLimitOrderBook());
         LOGGER.info("Executions {}", executionList);
         Assert.assertEquals("There should be four executions created ", 4, executionList.size());
         Assert.assertTrue("All sell side executions have same orderId", executionList.stream()
@@ -389,7 +391,7 @@ public class OrderBookTest {
         double price = 99.35;
         book.addOrder(createOrder(productId, price, 1000, Side.Sell));
 
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
         int count = 0;
         while (listOfNego.size() < 2 && count < 3) {
             count++;
@@ -414,7 +416,7 @@ public class OrderBookTest {
         double price = 100.00;
         book.addOrder(createOrder(productId, price, 1000, Side.Buy));
 
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
 
         int count = 0;
         while (listOfNego.size() < 1 && count < 3) {
@@ -498,14 +500,14 @@ public class OrderBookTest {
                 100.01, 100.34, 100.03);
         Order order = createOrder(productId, 99.02, 400, Side.Buy);
         book.addOrder(order);
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
         Order cancelOrder = Order.newBuilder(order)
                 .setMsgType(MsgType.Cancel)
                 .setOrderId(UUID.randomUUID().toString())
                 .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
                 .build();
         book.addOrder(cancelOrder);
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
     }
 
     @Test
@@ -517,7 +519,7 @@ public class OrderBookTest {
         Order order = createOrder(productId, 99.35, 400, Side.Buy);
         book.addOrder(order);
         Assert.assertTrue("Best bid should be 99.35000000", book.getBestBid().toPlainString().equals("99.35000000"));
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
         Order cancelOrder = Order.newBuilder(order)
                 .setMsgType(MsgType.Cancel)
                 .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
@@ -525,7 +527,7 @@ public class OrderBookTest {
         boolean cancelled = book.cancelOrder(cancelOrder);
         Assert.assertTrue("Order should be cancelled", cancelled);
         Assert.assertTrue("Best Bid should be 99.34000000", book.getBestBid().toPlainString().equals("99.34000000"));
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
     }
 
     @Test
@@ -537,7 +539,7 @@ public class OrderBookTest {
         Order order = createOrder(productId, 100.00, 400, Side.Sell);
         book.addOrder(order);
         Assert.assertTrue("Best ask should be 100.00000000", book.getBestAsk().toPlainString().equals("100.00000000"));
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
         Order cancelOrder = Order.newBuilder(order)
                 .setMsgType(MsgType.Cancel)
                 .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
@@ -545,7 +547,7 @@ public class OrderBookTest {
         boolean cancelled = book.cancelOrder(cancelOrder);
         Assert.assertTrue("Order should be cancelled", cancelled);
         Assert.assertTrue("Best Ask should be 100.01000000", book.getBestAsk().toPlainString().equals("100.01000000"));
-        LOGGER.info("After {}", book.printOrderBook());
+        LOGGER.info("After {}", book.printLimitOrderBook());
     }
 
     @Test(expected = IllegalArgumentException.class)
@@ -581,7 +583,7 @@ public class OrderBookTest {
 
         Order order = createOrder(productId, 100.00, 400, Side.Sell);
         book.addOrder(order);
-        LOGGER.info("Before Amend {}", book.printOrderBook());
+        LOGGER.info("Before Amend {}", book.printLimitOrderBook());
         Assert.assertTrue("Best Ask should be 100.00000000", book.getBestAsk().toPlainString().equals("100.00000000"));
 
         Order amendOrder = Order.newBuilder(order)
@@ -591,43 +593,234 @@ public class OrderBookTest {
 
         OrderBook spyOrderBook = spy(book);
         spyOrderBook.amendOrder(amendOrder);
-        LOGGER.info("After Amend {}", spyOrderBook.printOrderBook());
+        LOGGER.info("After Amend {}", spyOrderBook.printLimitOrderBook());
         Assert.assertTrue("Best Ask should be 99.99000000", spyOrderBook.getBestAsk().toPlainString().equals("99.99000000"));
         Mockito.verify(spyOrderBook, times(1)).cancelOrder(Mockito.any());
         Mockito.verify(spyOrderBook, times(1)).addOrder(Mockito.any());
     }
 
     @Test
-    public void add_order_with_quantity_less_than_or_equal_to_zero_should_throw_exception(){
-
-    }
-    @Test
-    public void add_limit_order_with_price_less_than_or_equal_to_zero_should_throw_exception(){
-
-    }
-    @Test
-    public void amend_limit_order_with_price_less_than_or_equal_to_zero_should_throw_exception(){
-
-    }
-    @Test
-    public void amend_order_with_quantity_less_than_or_equal_to_zero_should_throw_exception(){
+    public void add_order_with_quantity_less_than_or_equal_to_zero_should_throw_exception() {
 
     }
 
     @Test
-    public void market_order_should_walk_the_orderbook_to_full_execution(){
+    public void add_limit_order_with_price_less_than_or_equal_to_zero_should_throw_exception() {
 
     }
 
     @Test
-    public void market_order_should_walk_the_orderbook_for_partial_execution_and_add_to_top_level(){
+    public void amend_limit_order_with_price_less_than_or_equal_to_zero_should_throw_exception() {
 
     }
 
     @Test
-    public void limit_order_should_execute_existing_market_order_on_order_book(){
+    public void amend_order_with_quantity_less_than_or_equal_to_zero_should_throw_exception() {
 
     }
+
+    @Test
+    public void market_order_should_walk_the_orderbook_to_full_execution() throws ValidationException, InterruptedException {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+
+        MutableList<Execution> executionList = Lists.adapt(new ArrayList<>());
+        book.getExecutionProcessor().subscribe(executionList::add);
+        Order order = createOrder(productId, null, 4000, Side.Sell);
+        book.addOrder(order);
+        int count = 0;
+
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+        LOGGER.info("Executions {}", executionList);
+        LOGGER.info("After {}", book.printLimitOrderBook());
+        Assert.assertEquals("There are eight executions ", 8, executionList.size());
+        Assert.assertTrue("The executions should have quantity 1000", executionList.count(p -> p.getExecutedQuantity() == 1000) == 8);
+        Assert.assertTrue("There should be 4 executions should have price 99.34000000",
+                executionList.count(p -> p.getExecutedPrice().toPlainString().equals("99.34000000")) == 4);
+        Assert.assertTrue("There should be 2 executions should have price 99.03000000",
+                executionList.count(p -> p.getExecutedPrice().toPlainString().equals("99.03000000")) == 2);
+        Assert.assertTrue("There should be 2 executions should have price 99.01000000",
+                executionList.count(p -> p.getExecutedPrice().toPlainString().equals("99.01000000")) == 2);
+
+        Assert.assertTrue("Market asks are empty", book.getAskMKTSet().isEmpty());
+        Assert.assertTrue("Limit bids has zero depth", book.getBids().isEmpty());
+
+    }
+
+    @Test
+    public void market_order_should_walk_the_orderbook_for_partial_execution_and_add_to_top_level() throws InterruptedException, ValidationException {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+
+        MutableList<Execution> executionList = Lists.adapt(new ArrayList<>());
+        book.getExecutionProcessor().subscribe(executionList::add);
+        Order order = createOrder(productId, null, 2500, Side.Buy);
+        book.addOrder(order);
+        int count = 0;
+
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+        LOGGER.info("Executions {}", executionList);
+        LOGGER.info("After {}", book.printLimitOrderBook());
+        Assert.assertEquals("There should be six executions ", 6, executionList.size());
+        Assert.assertTrue("There should be 2 executions should have price 100.01000000",
+                executionList.count(p -> p.getExecutedPrice().toPlainString().equals("100.01000000")) == 2);
+        Assert.assertTrue("There should be 2 executions should have price 100.03000000",
+                executionList.count(p -> p.getExecutedPrice().toPlainString().equals("100.03000000")) == 2);
+        Assert.assertTrue("There should be 2 executions should have price 100.34000000",
+                executionList.count(p -> p.getExecutedPrice().toPlainString().equals("100.34000000")) == 2);
+        Assert.assertTrue("Market asks are empty", book.getBidMKTSet().isEmpty());
+        Assert.assertTrue("Limit asks are at depth 2", book.getAsks().size() == 2);
+        Assert.assertTrue("Top level limit order book has quantity 500", book.getAsks().getFirst().getQuantity() == 500);
+
+    }
+
+    @Test
+    public void market_order_book_shouldnt_cross_itself() throws ValidationException {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook marketOrderBook = createOrderBook(productId, pricetype);
+        Order order = createOrder(productId, null, 2500, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 800, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 2500, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 800, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+
+        Assert.assertTrue("MarketOrderBook Bid depth should be three", marketOrderBook.getBidMKTSet().size() == 3);
+        Assert.assertTrue("MarketOrderBook Ask depth should be three", marketOrderBook.getAskMKTSet().size() == 3);
+
+        Assert.assertTrue("LimitOrderBook Bid depth should be zero", marketOrderBook.getBids().size() == 0);
+        Assert.assertTrue("LimitOrderBook Ask depth should be zero", marketOrderBook.getAsks().size() == 0);
+
+    }
+
+    @Test
+    public void limit_order_should_execute_existing_market_order_on_order_book() throws ValidationException, InterruptedException {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook marketOrderBook = createOrderBook(productId, pricetype);
+        MutableList<Execution> executionList = Lists.adapt(new ArrayList<>());
+        marketOrderBook.getExecutionProcessor().subscribe(executionList::add);
+
+        Order order = createOrder(productId, null, 2500, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 800, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 2500, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 800, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+
+        double bidPrice = 99.34;
+
+        order = createOrder(productId, bidPrice, 5000, Side.Buy);
+
+        marketOrderBook.addOrder(order);
+        int count = 0;
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+        LOGGER.info("Executions {}", executionList);
+        LOGGER.info("LimitOrderBook {}", marketOrderBook.printLimitOrderBook());
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+
+        Assert.assertTrue("There should be four executions", executionList.size() == 4);
+        Assert.assertTrue("All executions should be @99.34", executionList.count(p -> p.getExecutedPrice().compareTo(new BigDecimal("99.34000000")) == 0) == 4);
+        Assert.assertTrue("MarketOrderBook ask depth is 2", marketOrderBook.getAskMKTSet().size() == 2);
+        Assert.assertTrue("LimitOrderBook bid depth is 0", marketOrderBook.getBids().size() == 0);
+
+    }
+
+    @Test
+    public void limit_order_should_execute_existing_market_order_on_order_book_add_add_to_limit_order_book() throws ValidationException, InterruptedException {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook marketOrderBook = createOrderBook(productId, pricetype);
+        MutableList<Execution> executionList = Lists.adapt(new ArrayList<>());
+        marketOrderBook.getExecutionProcessor().subscribe(executionList::add);
+
+        Order order = createOrder(productId, null, 2500, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 800, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 2500, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 800, Side.Sell);
+        marketOrderBook.addOrder(order);
+
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+
+        double bidPrice = 99.34;
+
+        order = createOrder(productId, bidPrice, 7000, Side.Buy);
+
+        marketOrderBook.addOrder(order);
+        int count = 0;
+        while (count < 3) {
+            count++;
+            Thread.sleep(1);
+        }
+        LOGGER.info("Executions {}", executionList);
+        LOGGER.info("LimitOrderBook {}", marketOrderBook.printLimitOrderBook());
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+
+        Assert.assertTrue("There should be six executions", executionList.size() == 6);
+        Assert.assertTrue("All executions should be @99.34", executionList
+                .count(p -> p.getExecutedPrice().compareTo(new BigDecimal("99.34000000")) == 0) == 6);
+        Assert.assertTrue("MarketOrderBook ask depth is 0", marketOrderBook.getAskMKTSet().size() == 0);
+        Assert.assertTrue("LimitOrderBook bid depth is 1", marketOrderBook.getBids().size() == 1);
+        Assert.assertTrue("LimitOrderBook bid quantity is 700", marketOrderBook.getBids().getFirst().getQuantity() == 700);
+    }
+
 
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) throws ValidationException {
         OrderBook book = orderBook;
@@ -643,24 +836,38 @@ public class OrderBookTest {
         book.addOrder(createOrder(productId, ask2, 1000, Side.Sell));
 
 
-        LOGGER.info("Before {}", book.printOrderBook());
+        LOGGER.info("Before {}", book.printLimitOrderBook());
         return book;
     }
 
-    private Order createOrder(String productId, double price, int quantity, Side side) {
-        BigDecimal priceInBigDecimal = new BigDecimal(String.valueOf(price)).setScale(8);
-        return Order.newBuilder()
-                .setOrderId(UUID.randomUUID().toString())
-                .setProductId(productId)
-                .setProductType(Bond)
-                .setOrderType(OrderType.LIMIT)
-                .setPrice(convertToByteBuffer(priceInBigDecimal, 8))
-                .setQuantity(quantity)
-                .setOrderCreation(Instant.now())
-                .setSubmitDate(LocalDate.now())
-                .setSide(side)
-                .setDiscretionaryOffset(0.01)
-                .build();
+    private Order createOrder(String productId, Double price, int quantity, Side side) {
+        if (price != null) {
+            BigDecimal priceInBigDecimal = new BigDecimal(String.valueOf(price.doubleValue())).setScale(8);
+            return Order.newBuilder()
+                    .setOrderId(UUID.randomUUID().toString())
+                    .setProductId(productId)
+                    .setProductType(Bond)
+                    .setOrderType(OrderType.LIMIT)
+                    .setPrice(convertToByteBuffer(priceInBigDecimal, 8))
+                    .setQuantity(quantity)
+                    .setOrderCreation(Instant.now())
+                    .setSubmitDate(LocalDate.now())
+                    .setSide(side)
+                    .setDiscretionaryOffset(0.01)
+                    .build();
+        } else {
+            return Order.newBuilder()
+                    .setOrderId(UUID.randomUUID().toString())
+                    .setProductId(productId)
+                    .setProductType(Bond)
+                    .setOrderType(OrderType.MKT)
+                    .setQuantity(quantity)
+                    .setOrderCreation(Instant.now())
+                    .setSubmitDate(LocalDate.now())
+                    .setSide(side)
+                    .setDiscretionaryOffset(0.01)
+                    .build();
+        }
     }
 
     private OrderBook createOrderBook(String productId, PriceType cash) {
