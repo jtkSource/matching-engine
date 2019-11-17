@@ -821,6 +821,39 @@ public class OrderBookTest {
         Assert.assertTrue("LimitOrderBook bid quantity is 700", marketOrderBook.getBids().getFirst().getQuantity() == 700);
     }
 
+    @Test
+    public void amend_market_order_should_result_cancel_old_order_and_add_new_order() throws ValidationException {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+
+        OrderBook marketOrderBook = createOrderBook(productId, pricetype);
+
+        Order order = createOrder(productId, null, 2500, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+        order = createOrder(productId, null, 3000, Side.Buy);
+        marketOrderBook.addOrder(order);
+
+
+
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+
+
+        Order amendOrder = Order.newBuilder(order)
+                .setMsgType(MsgType.Amend)
+                .setQuantity(4500)
+                .build();
+
+        OrderBook spyOrderBook = spy(marketOrderBook);
+        spyOrderBook.amendOrder(amendOrder);
+        LOGGER.info("MarketOrderBook {}", marketOrderBook.printMarketOrderBook());
+        LOGGER.info("LimitOrderBook {}", marketOrderBook.printLimitOrderBook());
+
+        Mockito.verify(spyOrderBook, times(1)).cancelOrder(Mockito.any());
+        Mockito.verify(spyOrderBook, times(1)).addOrder(Mockito.any());
+    }
+
+
 
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) throws ValidationException {
         OrderBook book = orderBook;

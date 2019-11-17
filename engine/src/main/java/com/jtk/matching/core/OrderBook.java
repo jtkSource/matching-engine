@@ -174,22 +174,43 @@ public class OrderBook {
         validateCancelOrder(cancelOrder);
 
         if (cancelOrder.getSide() == Side.Sell) {
-            try {
-                lmtAskRWLock.writeLock().lock();
-                isCancelled = askSet.remove(askSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
-                updateBestAsk();
-                orderIdSet.remove(cancelOrder.getOrderId());
-            } finally {
-                lmtAskRWLock.writeLock().unlock();
+            if(cancelOrder.getOrderType() == OrderType.LIMIT) {
+                try {
+                    lmtAskRWLock.writeLock().lock();
+                    isCancelled = askSet.remove(askSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
+                    updateBestAsk();
+                    orderIdSet.remove(cancelOrder.getOrderId());
+                } finally {
+                    lmtAskRWLock.writeLock().unlock();
+                }
+            }else {
+                try{
+                    mktAskRWLock.writeLock().lock();
+                    isCancelled = askMKTSet.remove(askMKTSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
+                    orderIdSet.remove(cancelOrder.getOrderId());
+                }finally {
+                    mktAskRWLock.writeLock().unlock();
+                }
             }
+
         } else {
-            try {
-                lmtBidRWLock.writeLock().lock();
-                isCancelled = bidSet.remove(bidSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
-                updateBestBid();
-                orderIdSet.remove(cancelOrder.getOrderId());
-            } finally {
-                lmtBidRWLock.writeLock().unlock();
+            if(cancelOrder.getOrderType() == OrderType.LIMIT) {
+                try {
+                    lmtBidRWLock.writeLock().lock();
+                    isCancelled = bidSet.remove(bidSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
+                    updateBestBid();
+                    orderIdSet.remove(cancelOrder.getOrderId());
+                } finally {
+                    lmtBidRWLock.writeLock().unlock();
+                }
+            }else {
+                try{
+                    mktBidRWLock.writeLock().lock();
+                    isCancelled = bidMKTSet.remove(bidMKTSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
+                    orderIdSet.remove(cancelOrder.getOrderId());
+                }finally {
+                    mktBidRWLock.writeLock().unlock();
+                }
             }
         }
         return isCancelled;
