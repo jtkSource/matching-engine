@@ -3,6 +3,8 @@ package com.jtk.matching.api;
 import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.OrderType;
 import com.jtk.matching.api.gen.enums.Side;
+import org.apache.avro.Conversions;
+import org.apache.avro.LogicalTypes;
 import org.apache.avro.file.DataFileReader;
 import org.apache.avro.file.DataFileWriter;
 import org.apache.avro.io.DatumReader;
@@ -47,7 +49,7 @@ public class TestAvroSchema {
                 .setProductId("XSS")
                 .setProductType(Bond)
                 .setOrderType(OrderType.LIMIT)
-                .setPrice(new BigDecimal(9))
+                .setPrice(new Conversions.DecimalConversion().toBytes(new BigDecimal(8).setScale(8),null,LogicalTypes.decimal(8, 8)))
                 .setQuantity(999)
                 .setOrderCreation(Instant.now())
                 .setSubmitDate(LocalDate.now())
@@ -93,15 +95,15 @@ public class TestAvroSchema {
     private Order writeOrderToFile() throws IOException {
         store = File.createTempFile("orders", ".avro");
         LOGGER.info("File path: {}", store.getPath());
-        BigDecimal price = new BigDecimal("9988900879009.00099495743594375349536456");
-        price.setScale(10, RoundingMode.UP);
+        BigDecimal price = new BigDecimal("9988900879009.00099495743594375349536456")
+                .setScale(8, RoundingMode.DOWN);
 
         Order order = Order.newBuilder()
                 .setOrderId(UUID.randomUUID().toString())
                 .setProductId("XSS")
                 .setProductType(Bond)
                 .setOrderType(OrderType.LIMIT)
-                .setPrice(price)
+                .setPrice(new Conversions.DecimalConversion().toBytes(price,null, LogicalTypes.decimal(8,8)))
                 .setQuantity(999)
                 .setOrderCreation(Instant.now())
                 .setSubmitDate(LocalDate.now())

@@ -5,4 +5,5 @@ module com.jtk.matching.core {
     requires com.jtk.matching.api;
     requires reactor.core;
     requires java.logging;
+    requires org.apache.avro;
 }

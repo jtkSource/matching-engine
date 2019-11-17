@@ -1,11 +1,14 @@
 package com.jtk.matching.core;
 
+import static com.jtk.matching.api.avro.AvroUtil.*;
 import com.jtk.matching.api.gen.Execution;
 import com.jtk.matching.api.gen.Order;
+import com.jtk.matching.api.gen.enums.MsgType;
 import com.jtk.matching.api.gen.enums.OrderType;
 import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
 import org.eclipse.collections.api.tuple.Pair;
+import org.eclipse.collections.impl.multimap.set.sorted.TreeSortedSetMultimap;
 import org.junit.Assert;
 import org.junit.Test;
 import org.slf4j.Logger;
@@ -16,6 +19,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -301,8 +305,6 @@ public class OrderBookTest {
         Assert.assertTrue("Final Best Bid should be 100.03000000", book.getAsks().getFirst().getPrice().toPlainString().equals("100.03000000"));
 
         Assert.assertTrue("Top level Bid quantity is 500 ", book.getAsks().getFirst().getQuantity() == 500);
-
-
     }
 
     @Test
@@ -483,6 +485,65 @@ public class OrderBookTest {
 
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void cancel_order_should_throw_exception_when_calling_wrong_method() {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+        Order order = createOrder(productId, 99.02, 400, Side.Buy);
+        book.addOrder(order);
+        LOGGER.info("After {}", book.printOrderBook());
+        Order cancelOrder = Order.newBuilder(order)
+                .setMsgType(MsgType.Cancel)
+                .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
+                .build();
+        book.addOrder(cancelOrder);
+        LOGGER.info("After {}", book.printOrderBook());
+    }
+
+    @Test
+    public void cancel_bid_order_should_remove_bid_order_in_orderbook() {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+        Order order = createOrder(productId, 99.35, 400, Side.Buy);
+        book.addOrder(order);
+        Assert.assertTrue("Best bid should be 99.35000000",book.getBestBid().toPlainString().equals("99.35000000"));
+        LOGGER.info("After {}", book.printOrderBook());
+        Order cancelOrder = Order.newBuilder(order)
+                .setMsgType(MsgType.Cancel)
+                .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
+                .build();
+        boolean cancelled = book.cancelOrder(cancelOrder);
+        Assert.assertTrue("Order should be cancelled", cancelled);
+        Assert.assertTrue("Best Bid should be 99.34000000",book.getBestBid().toPlainString().equals("99.34000000"));
+        LOGGER.info("After {}", book.printOrderBook());
+    }
+
+
+    @Test
+    public void cancel_ask_order_should_remove_ask_order_in_orderbook() {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+        Order order = createOrder(productId, 100.00, 400, Side.Sell);
+        book.addOrder(order);
+        Assert.assertTrue("Best ask should be 100.00000000",book.getBestAsk().toPlainString().equals("100.00000000"));
+        LOGGER.info("After {}", book.printOrderBook());
+        Order cancelOrder = Order.newBuilder(order)
+                .setMsgType(MsgType.Cancel)
+                .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
+                .build();
+        boolean cancelled = book.cancelOrder(cancelOrder);
+        Assert.assertTrue("Order should be cancelled", cancelled);
+        Assert.assertTrue("Best Ask should be 100.01000000",book.getBestAsk().toPlainString().equals("100.01000000"));
+        LOGGER.info("After {}", book.printOrderBook());
+    }
+
+
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {
         OrderBook book = orderBook;
 
@@ -502,12 +563,13 @@ public class OrderBookTest {
     }
 
     private Order createOrder(String productId, double price, int quantity, Side side) {
+        BigDecimal priceInBigDecimal = new BigDecimal(String.valueOf(price)).setScale(8);
         return Order.newBuilder()
                 .setOrderId(UUID.randomUUID().toString())
                 .setProductId(productId)
                 .setProductType(Bond)
                 .setOrderType(OrderType.LIMIT)
-                .setPrice(new BigDecimal(String.valueOf(price)))
+                .setPrice(convertToByteBuffer(priceInBigDecimal, 8))
                 .setQuantity(quantity)
                 .setOrderCreation(Instant.now())
                 .setSubmitDate(LocalDate.now())

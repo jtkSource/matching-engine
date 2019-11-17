@@ -3,4 +3,5 @@ module com.jtk.matching.api {
     requires org.slf4j;
     exports com.jtk.matching.api.gen;
     exports com.jtk.matching.api.gen.enums;
+    exports com.jtk.matching.api.avro;
 }

@@ -1,7 +1,9 @@
 package com.jtk.matching.core;
 
+import static com.jtk.matching.api.avro.AvroUtil.convertToBigDecimal;
 import com.jtk.matching.api.gen.Execution;
 import com.jtk.matching.api.gen.Order;
+import com.jtk.matching.api.gen.enums.MsgType;
 import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
 import org.eclipse.collections.api.list.MutableList;
@@ -44,13 +46,13 @@ public class OrderBook {
 
     private final TreeSortedSet<OrderBookEntry> askSet;
 
+
     private final Comparator<OrderBookEntry> descPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice, Comparator.reverseOrder())
             .thenComparingLong(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
 
     private final Comparator<OrderBookEntry> ascPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice)
             .thenComparing(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
 
-    //Pair<bid,ask>
     private final EmitterProcessor<Pair<OrderBookEntry, OrderBookEntry>> negoProcessor;
     //Pair<bid,ask>
     private final EmitterProcessor<Pair<Optional<BigDecimal>, Optional<BigDecimal>>> topLevelPriceProcessor;
@@ -121,8 +123,11 @@ public class OrderBook {
 
     //TODO: validations - price cant be negative, MKT prices to be supported, handling order quantity amends, handling order price amends
     public void addOrder(Order order) {
+        if (order.getMsgType() != MsgType.New)
+            throw new IllegalArgumentException("Only New Order Type is accepted");
         OrderBookEntry orderEntry =
-                new OrderBookEntry(order.getOrderId(), order.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN),
+                new OrderBookEntry(order.getOrderId(),
+                        convertToBigDecimal(order.getPrice(), PRICE_SCALE),
                         order.getQuantity(), order.getDiscretionaryOffset(), order.getSide());
         if (orderEntry.getSide() == Side.Buy) {
             addBuyOrder(orderEntry);
@@ -138,6 +143,31 @@ public class OrderBook {
                 .publishOn(Schedulers.newSingle("nego-source"))
                 .log("orderbook.nego.", Level.FINE)
                 .subscribe(negoProcessor::onNext);
+    }
+
+    public boolean cancelOrder(Order cancelOrder) {
+        boolean isCancelled;
+        if (cancelOrder.getMsgType() != MsgType.Cancel)
+            throw new IllegalArgumentException("Only Cancel Message Type is accepted");
+        if (cancelOrder.getSide() == Side.Sell) {
+            try {
+                askRWLock.writeLock().lock();
+                isCancelled = askSet.remove(askSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
+                updateBestAsk();
+            } finally {
+                askRWLock.writeLock().unlock();
+            }
+        } else {
+            try {
+                bidRWLock.writeLock().lock();
+                isCancelled = bidSet.remove(bidSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
+                updateBestBid();
+            } finally {
+                bidRWLock.writeLock().unlock();
+            }
+        }
+
+        return isCancelled;
     }
 
     public BigDecimal getBestAsk() {
@@ -397,7 +427,8 @@ public class OrderBook {
         bestAsk.set(askSet.getFirst().price);
     }
 
-    final class OrderBookEntry {
+
+    static final class OrderBookEntry {
         private final CharSequence orderId;
         private final BigDecimal price;
         private final long orderBookEntryTimeInMillis;

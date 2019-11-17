@@ -14,15 +14,14 @@ import org.apache.avro.message.SchemaStore;
 
 @org.apache.avro.specific.AvroGenerated
 public class Order extends org.apache.avro.specific.SpecificRecordBase implements org.apache.avro.specific.SpecificRecord {
-  private static final long serialVersionUID = -1867773005019056189L;
-  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Order\",\"namespace\":\"com.jtk.matching.api.gen\",\"fields\":[{\"name\":\"orderId\",\"type\":\"string\"},{\"name\":\"productId\",\"type\":\"string\"},{\"name\":\"orderType\",\"type\":{\"type\":\"enum\",\"name\":\"OrderType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"LIMIT\",\"MKT\"]},\"default\":\"LIMIT\"},{\"name\":\"productType\",\"type\":{\"type\":\"enum\",\"name\":\"ProductType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Bond\",\"Repo\"]}},{\"name\":\"priceType\",\"type\":{\"type\":\"enum\",\"name\":\"PriceType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Cash\",\"Spread\"]},\"default\":\"Cash\"},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"Side\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Buy\",\"Sell\"]}},{\"name\":\"msgType\",\"type\":{\"type\":\"enum\",\"name\":\"MsgType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"New\",\"Amend\",\"Cancel\",\"IOI\"]},\"default\":\"New\"},{\"name\":\"orderCreation\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}},{\"name\":\"submitDate\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}},{\"name\":\"price\",\"type\":{\"type\":\"string\",\"java-class\":\"java.math.BigDecimal\"}},{\"name\":\"discretionaryOffset\",\"type\":\"double\",\"default\":0.0},{\"name\":\"quantity\",\"type\":\"long\"}]}");
+  private static final long serialVersionUID = 3772051583310984264L;
+  public static final org.apache.avro.Schema SCHEMA$ = new org.apache.avro.Schema.Parser().parse("{\"type\":\"record\",\"name\":\"Order\",\"namespace\":\"com.jtk.matching.api.gen\",\"fields\":[{\"name\":\"orderId\",\"type\":\"string\"},{\"name\":\"productId\",\"type\":\"string\"},{\"name\":\"orderType\",\"type\":{\"type\":\"enum\",\"name\":\"OrderType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"LIMIT\",\"MKT\"]},\"default\":\"LIMIT\"},{\"name\":\"productType\",\"type\":{\"type\":\"enum\",\"name\":\"ProductType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Bond\",\"Repo\"]}},{\"name\":\"priceType\",\"type\":{\"type\":\"enum\",\"name\":\"PriceType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Cash\",\"Spread\"]},\"default\":\"Cash\"},{\"name\":\"side\",\"type\":{\"type\":\"enum\",\"name\":\"Side\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"Buy\",\"Sell\"]}},{\"name\":\"msgType\",\"type\":{\"type\":\"enum\",\"name\":\"MsgType\",\"namespace\":\"com.jtk.matching.api.gen.enums\",\"symbols\":[\"New\",\"Amend\",\"Cancel\",\"IOI\"]},\"default\":\"New\"},{\"name\":\"orderCreation\",\"type\":{\"type\":\"long\",\"logicalType\":\"timestamp-millis\"}},{\"name\":\"submitDate\",\"type\":{\"type\":\"int\",\"logicalType\":\"date\"}},{\"name\":\"price\",\"type\":{\"type\":\"bytes\",\"logicalType\":\"decimal\",\"precision\":8,\"scale\":8}},{\"name\":\"discretionaryOffset\",\"type\":\"double\",\"default\":0.0},{\"name\":\"quantity\",\"type\":\"long\"}]}");
   public static org.apache.avro.Schema getClassSchema() { return SCHEMA$; }
 
   private static SpecificData MODEL$ = new SpecificData();
 static {
     MODEL$.addLogicalTypeConversion(new org.apache.avro.data.TimeConversions.DateConversion());
     MODEL$.addLogicalTypeConversion(new org.apache.avro.data.TimeConversions.TimestampMillisConversion());
-    MODEL$.addLogicalTypeConversion(new org.apache.avro.Conversions.DecimalConversion());
   }
 
   private static final BinaryMessageEncoder<Order> ENCODER =
@@ -85,7 +84,7 @@ static {
   @Deprecated public com.jtk.matching.api.gen.enums.MsgType msgType;
   @Deprecated public java.time.Instant orderCreation;
   @Deprecated public java.time.LocalDate submitDate;
-  @Deprecated public java.math.BigDecimal price;
+  @Deprecated public java.nio.ByteBuffer price;
   @Deprecated public double discretionaryOffset;
   @Deprecated public long quantity;
 
@@ -111,7 +110,7 @@ static {
    * @param discretionaryOffset The new value for discretionaryOffset
    * @param quantity The new value for quantity
    */
-  public Order(java.lang.CharSequence orderId, java.lang.CharSequence productId, com.jtk.matching.api.gen.enums.OrderType orderType, com.jtk.matching.api.gen.enums.ProductType productType, com.jtk.matching.api.gen.enums.PriceType priceType, com.jtk.matching.api.gen.enums.Side side, com.jtk.matching.api.gen.enums.MsgType msgType, java.time.Instant orderCreation, java.time.LocalDate submitDate, java.math.BigDecimal price, java.lang.Double discretionaryOffset, java.lang.Long quantity) {
+  public Order(java.lang.CharSequence orderId, java.lang.CharSequence productId, com.jtk.matching.api.gen.enums.OrderType orderType, com.jtk.matching.api.gen.enums.ProductType productType, com.jtk.matching.api.gen.enums.PriceType priceType, com.jtk.matching.api.gen.enums.Side side, com.jtk.matching.api.gen.enums.MsgType msgType, java.time.Instant orderCreation, java.time.LocalDate submitDate, java.nio.ByteBuffer price, java.lang.Double discretionaryOffset, java.lang.Long quantity) {
     this.orderId = orderId;
     this.productId = productId;
     this.orderType = orderType;
@@ -182,7 +181,7 @@ static {
     case 6: msgType = (com.jtk.matching.api.gen.enums.MsgType)value$; break;
     case 7: orderCreation = (java.time.Instant)value$; break;
     case 8: submitDate = (java.time.LocalDate)value$; break;
-    case 9: price = (java.math.BigDecimal)value$; break;
+    case 9: price = (java.nio.ByteBuffer)value$; break;
     case 10: discretionaryOffset = (java.lang.Double)value$; break;
     case 11: quantity = (java.lang.Long)value$; break;
     default: throw new org.apache.avro.AvroRuntimeException("Bad index");
@@ -346,7 +345,7 @@ static {
    * Gets the value of the 'price' field.
    * @return The value of the 'price' field.
    */
-  public java.math.BigDecimal getPrice() {
+  public java.nio.ByteBuffer getPrice() {
     return price;
   }
 
@@ -355,7 +354,7 @@ static {
    * Sets the value of the 'price' field.
    * @param value the value to set.
    */
-  public void setPrice(java.math.BigDecimal value) {
+  public void setPrice(java.nio.ByteBuffer value) {
     this.price = value;
   }
 
@@ -442,7 +441,7 @@ static {
     private com.jtk.matching.api.gen.enums.MsgType msgType;
     private java.time.Instant orderCreation;
     private java.time.LocalDate submitDate;
-    private java.math.BigDecimal price;
+    private java.nio.ByteBuffer price;
     private double discretionaryOffset;
     private long quantity;
 
@@ -925,7 +924,7 @@ static {
       * Gets the value of the 'price' field.
       * @return The value.
       */
-    public java.math.BigDecimal getPrice() {
+    public java.nio.ByteBuffer getPrice() {
       return price;
     }
 
@@ -935,7 +934,7 @@ static {
       * @param value The value of 'price'.
       * @return This builder.
       */
-    public com.jtk.matching.api.gen.Order.Builder setPrice(java.math.BigDecimal value) {
+    public com.jtk.matching.api.gen.Order.Builder setPrice(java.nio.ByteBuffer value) {
       validate(fields()[9], value);
       this.price = value;
       fieldSetFlags()[9] = true;
@@ -1053,7 +1052,7 @@ static {
         record.msgType = fieldSetFlags()[6] ? this.msgType : (com.jtk.matching.api.gen.enums.MsgType) defaultValue(fields()[6]);
         record.orderCreation = fieldSetFlags()[7] ? this.orderCreation : (java.time.Instant) defaultValue(fields()[7]);
         record.submitDate = fieldSetFlags()[8] ? this.submitDate : (java.time.LocalDate) defaultValue(fields()[8]);
-        record.price = fieldSetFlags()[9] ? this.price : (java.math.BigDecimal) defaultValue(fields()[9]);
+        record.price = fieldSetFlags()[9] ? this.price : (java.nio.ByteBuffer) defaultValue(fields()[9]);
         record.discretionaryOffset = fieldSetFlags()[10] ? this.discretionaryOffset : (java.lang.Double) defaultValue(fields()[10]);
         record.quantity = fieldSetFlags()[11] ? this.quantity : (java.lang.Long) defaultValue(fields()[11]);
         return record;
