@@ -9,6 +9,7 @@ import com.jtk.matching.api.gen.enums.Side;
 import org.eclipse.collections.api.list.MutableList;
 import org.eclipse.collections.api.set.sorted.MutableSortedSet;
 import org.eclipse.collections.api.tuple.Pair;
+import org.eclipse.collections.impl.set.mutable.UnifiedSet;
 import org.eclipse.collections.impl.set.sorted.mutable.TreeSortedSet;
 import org.eclipse.collections.impl.tuple.Tuples;
 import org.slf4j.Logger;
@@ -22,9 +23,11 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
@@ -46,6 +49,7 @@ public class OrderBook {
 
     private final TreeSortedSet<OrderBookEntry> askSet;
 
+    private final UnifiedSet<String> orderIdSet = new UnifiedSet<>();
 
     private final Comparator<OrderBookEntry> descPriceTimeComparator = Comparator.comparing(OrderBookEntry::getPrice, Comparator.reverseOrder())
             .thenComparingLong(OrderBookEntry::getOrderBookEntryTimeInMillis).thenComparing(OrderBookEntry::getOrderId);
@@ -121,10 +125,13 @@ public class OrderBook {
         return executionProcessor;
     }
 
-    //TODO: validations - price cant be negative, MKT prices to be supported, handling order quantity amends, handling order price amends
+    //TODO: validations - MKT prices to be supported
     public void addOrder(Order order) {
         if (order.getMsgType() != MsgType.New)
             throw new IllegalArgumentException("Only New Order Type is accepted");
+        if(orderIdSet.contains(order.getOrderId()))
+            throw new IllegalArgumentException("OrderId "+order.getOrderId()+" is already in order-book");
+
         OrderBookEntry orderEntry =
                 new OrderBookEntry(order.getOrderId(),
                         convertToBigDecimal(order.getPrice(), PRICE_SCALE),
@@ -149,11 +156,15 @@ public class OrderBook {
         boolean isCancelled;
         if (cancelOrder.getMsgType() != MsgType.Cancel)
             throw new IllegalArgumentException("Only Cancel Message Type is accepted");
+        if(!orderIdSet.contains(cancelOrder.getOrderId()))
+            throw new IllegalArgumentException("OrderId "+cancelOrder.getOrderId()+" is doesnt exist in order-book");
+
         if (cancelOrder.getSide() == Side.Sell) {
             try {
                 askRWLock.writeLock().lock();
                 isCancelled = askSet.remove(askSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
                 updateBestAsk();
+                orderIdSet.remove(cancelOrder.getOrderId());
             } finally {
                 askRWLock.writeLock().unlock();
             }
@@ -162,12 +173,26 @@ public class OrderBook {
                 bidRWLock.writeLock().lock();
                 isCancelled = bidSet.remove(bidSet.select(p -> p.getOrderId().equals(cancelOrder.getOrderId())).getFirst());
                 updateBestBid();
+                orderIdSet.remove(cancelOrder.getOrderId());
             } finally {
                 bidRWLock.writeLock().unlock();
             }
         }
-
         return isCancelled;
+    }
+
+
+    public boolean amendOrder(Order amendOrder) {
+        if(amendOrder.getMsgType() != MsgType.Amend){
+            throw new IllegalArgumentException("Only amend orders accepted");
+        }
+        if(cancelOrder(Order.newBuilder(amendOrder).setMsgType(MsgType.Cancel).build())){
+            Order newOrder = Order.newBuilder(amendOrder).setMsgType(MsgType.New).build();
+            addOrder(newOrder);
+            return Boolean.TRUE;
+        }else {
+            return Boolean.FALSE;
+        }
     }
 
     public BigDecimal getBestAsk() {
@@ -275,6 +300,7 @@ public class OrderBook {
             try {
                 askRWLock.writeLock().lock();
                 askSet.add(orderEntry);
+                orderIdSet.add(orderEntry.getOrderId());
                 updateBestAsk();
             } finally {
                 askRWLock.writeLock().unlock();
@@ -288,6 +314,7 @@ public class OrderBook {
                     orderEntry = new OrderBookEntry(orderEntry.getOrderId(), orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN),
                             remainingQty, orderEntry.getDiscretionaryOffset(), orderEntry.getSide());
                     askSet.add(orderEntry);
+                    orderIdSet.add(orderEntry.getOrderId());
                     updateBestAsk();
                 }
             } finally {
@@ -301,6 +328,7 @@ public class OrderBook {
             try {
                 bidRWLock.writeLock().lock();
                 bidSet.add(orderEntry);
+                orderIdSet.add(orderEntry.getOrderId());
                 updateBestBid();
             } finally {
                 bidRWLock.writeLock().unlock();
@@ -313,6 +341,7 @@ public class OrderBook {
                     orderEntry = new OrderBookEntry(orderEntry.getOrderId(), orderEntry.getPrice().setScale(PRICE_SCALE, RoundingMode.DOWN),
                             remainingQty, orderEntry.getDiscretionaryOffset(), orderEntry.getSide());
                     bidSet.add(orderEntry);
+                    orderIdSet.add(orderEntry.getOrderId());
                     updateBestBid();
                 }
             } finally {
@@ -426,7 +455,6 @@ public class OrderBook {
     private void updateBestAsk() {
         bestAsk.set(askSet.getFirst().price);
     }
-
 
     static final class OrderBookEntry {
         private final CharSequence orderId;

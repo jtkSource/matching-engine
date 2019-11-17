@@ -11,6 +11,8 @@ import org.eclipse.collections.api.tuple.Pair;
 import org.eclipse.collections.impl.multimap.set.sorted.TreeSortedSetMultimap;
 import org.junit.Assert;
 import org.junit.Test;
+import org.mockito.Mockito;
+import static org.mockito.Mockito.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -510,7 +512,7 @@ public class OrderBookTest {
                 100.01, 100.34, 100.03);
         Order order = createOrder(productId, 99.35, 400, Side.Buy);
         book.addOrder(order);
-        Assert.assertTrue("Best bid should be 99.35000000",book.getBestBid().toPlainString().equals("99.35000000"));
+        Assert.assertTrue("Best bid should be 99.35000000", book.getBestBid().toPlainString().equals("99.35000000"));
         LOGGER.info("After {}", book.printOrderBook());
         Order cancelOrder = Order.newBuilder(order)
                 .setMsgType(MsgType.Cancel)
@@ -518,7 +520,7 @@ public class OrderBookTest {
                 .build();
         boolean cancelled = book.cancelOrder(cancelOrder);
         Assert.assertTrue("Order should be cancelled", cancelled);
-        Assert.assertTrue("Best Bid should be 99.34000000",book.getBestBid().toPlainString().equals("99.34000000"));
+        Assert.assertTrue("Best Bid should be 99.34000000", book.getBestBid().toPlainString().equals("99.34000000"));
         LOGGER.info("After {}", book.printOrderBook());
     }
 
@@ -531,7 +533,7 @@ public class OrderBookTest {
                 100.01, 100.34, 100.03);
         Order order = createOrder(productId, 100.00, 400, Side.Sell);
         book.addOrder(order);
-        Assert.assertTrue("Best ask should be 100.00000000",book.getBestAsk().toPlainString().equals("100.00000000"));
+        Assert.assertTrue("Best ask should be 100.00000000", book.getBestAsk().toPlainString().equals("100.00000000"));
         LOGGER.info("After {}", book.printOrderBook());
         Order cancelOrder = Order.newBuilder(order)
                 .setMsgType(MsgType.Cancel)
@@ -539,10 +541,58 @@ public class OrderBookTest {
                 .build();
         boolean cancelled = book.cancelOrder(cancelOrder);
         Assert.assertTrue("Order should be cancelled", cancelled);
-        Assert.assertTrue("Best Ask should be 100.01000000",book.getBestAsk().toPlainString().equals("100.01000000"));
+        Assert.assertTrue("Best Ask should be 100.01000000", book.getBestAsk().toPlainString().equals("100.01000000"));
         LOGGER.info("After {}", book.printOrderBook());
     }
 
+    @Test(expected = IllegalArgumentException.class)
+    public void add_existing_order_should_result_in_exception_being_thrown() {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+        Order order = createOrder(productId, 100.00, 400, Side.Sell);
+        book.addOrder(order);
+        Order order1 = createOrder(productId, 100.00, 400, Side.Sell);
+        order1.setOrderId(order.getOrderId());
+        book.addOrder(order1);
+    }
+
+    @Test(expected = IllegalArgumentException.class)
+    public void cancel_non_existent_order_should_result_in_exception_being_thrown() {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+        Order order = createOrder(productId, 100.00, 400, Side.Sell);
+        book.cancelOrder(order);
+    }
+
+    @Test
+    public void amend_order_should_result_cancel_old_order_and_add_new_order() {
+        String productId = "XSS";
+        PriceType pricetype = PriceType.Cash;
+        OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
+                100.01, 100.34, 100.03);
+
+
+        Order order = createOrder(productId, 100.00, 400, Side.Sell);
+        book.addOrder(order);
+        LOGGER.info("Before Amend {}", book.printOrderBook());
+        Assert.assertTrue("Best Ask should be 100.00000000", book.getBestAsk().toPlainString().equals("100.00000000"));
+
+        Order amendOrder = Order.newBuilder(order)
+                .setMsgType(MsgType.Amend)
+                .setPrice(convertToByteBuffer(new BigDecimal(String.valueOf(99.99)).setScale(8, RoundingMode.DOWN), 8))
+                .build();
+
+        OrderBook spyOrderBook = spy(book);
+        spyOrderBook.amendOrder(amendOrder);
+        LOGGER.info("After Amend {}", spyOrderBook.printOrderBook());
+        Assert.assertTrue("Best Ask should be 99.99000000", spyOrderBook.getBestAsk().toPlainString().equals("99.99000000"));
+        Mockito.verify(spyOrderBook, times(1)).cancelOrder(Mockito.any());
+        Mockito.verify(spyOrderBook, times(1)).addOrder(Mockito.any());
+    }
 
     private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {
         OrderBook book = orderBook;
