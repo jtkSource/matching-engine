@@ -14,7 +14,9 @@ public class AvroUtil {
 
     public static BigDecimal convertToBigDecimal(ByteBuffer buffer, int scale) {
         buffer.clear();
-        return DECIMAL_CONVERSION.fromBytes(buffer, Schema.create(Schema.Type.BYTES), LogicalTypes.decimal(scale, scale));
+        BigDecimal bigDecimal = DECIMAL_CONVERSION.fromBytes(buffer, Schema.create(Schema.Type.BYTES), LogicalTypes.decimal(scale, scale));
+        buffer.clear();
+        return bigDecimal;
     }
 
     public static ByteBuffer convertToByteBuffer(BigDecimal decimal, int scale) {

@@ -1,18 +1,22 @@
 package com.jtk.matching.core;
 
-import static com.jtk.matching.api.avro.AvroUtil.*;
+import static com.jtk.matching.api.avro.AvroUtil.convertToByteBuffer;
 import com.jtk.matching.api.gen.Execution;
 import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.MsgType;
 import com.jtk.matching.api.gen.enums.OrderType;
 import com.jtk.matching.api.gen.enums.PriceType;
+import static com.jtk.matching.api.gen.enums.ProductType.Bond;
 import com.jtk.matching.api.gen.enums.Side;
+import com.jtk.matching.core.exp.ValidationException;
 import org.eclipse.collections.api.tuple.Pair;
-import org.eclipse.collections.impl.multimap.set.sorted.TreeSortedSetMultimap;
 import org.junit.Assert;
+import org.junit.Rule;
 import org.junit.Test;
+import org.junit.rules.ExpectedException;
 import org.mockito.Mockito;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.times;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,17 +25,17 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-import static com.jtk.matching.api.gen.enums.ProductType.Bond;
-
 public class OrderBookTest {
 
     private final static Logger LOGGER = LoggerFactory.getLogger(OrderBookTest.class);
+
+    @Rule
+    public ExpectedException exception = ExpectedException.none();
 
     @Test
     public void create_orderBook_based_on_productID_and_priceType() {
@@ -43,7 +47,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_three_bid_order_to_order_book_should_create_a_list_of_three_bids() {
+    public void add_three_bid_order_to_order_book_should_create_a_list_of_three_bids() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createOrderBook(productId, pricetype);
@@ -54,7 +58,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_three_sell_order_to_order_book_should_create_a_list_of_three_asks() {
+    public void add_three_sell_order_to_order_book_should_create_a_list_of_three_asks() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createOrderBook(productId, pricetype);
@@ -65,7 +69,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_to_order_book_should_sort_bid_from_hi_to_low_price_and_ask_from_low_to_hi_and_long_to_short_time() {
+    public void add_to_order_book_should_sort_bid_from_hi_to_low_price_and_ask_from_low_to_hi_and_long_to_short_time() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
@@ -130,7 +134,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void reverse_order_book_sorting_should_sort_bid_price_from_lo_to_hi_and_ask_price_from_hi_to_lo_and_long_to_short_time() {
+    public void reverse_order_book_sorting_should_sort_bid_price_from_lo_to_hi_and_ask_price_from_hi_to_lo_and_long_to_short_time() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Spread;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype, true), 5.01, 5.34, 5.03, 4.01, 4.34, 4.03);
@@ -178,7 +182,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_to_order_book_should_return_best_bid_and_best_ask() {
+    public void add_to_order_book_should_return_best_bid_and_best_ask() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
@@ -191,7 +195,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_to_order_book_should_return_best_bid_and_best_ask_for_reversedorder() {
+    public void add_to_order_book_should_return_best_bid_and_best_ask_for_reversedorder() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Spread;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype, true), 5.01, 5.34, 5.03,
@@ -204,9 +208,8 @@ public class OrderBookTest {
 
     }
 
-
     @Test
-    public void add_matching_bid_to_order_book_should_result_in_removing_top_level_on_ask_and_bid_is_partially_executed_at_five_hundered() {
+    public void add_matching_bid_to_order_book_should_result_in_removing_top_level_on_ask_and_bid_is_partially_executed_at_five_hundered() throws ValidationException {
         String productId = "XSS";
 
         PriceType pricetype = PriceType.Cash;
@@ -229,7 +232,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_matching_bid_should_create_two_executions() throws InterruptedException {
+    public void add_matching_bid_should_create_two_executions() throws InterruptedException, ValidationException {
 
         String productId = "XSS";
 
@@ -267,7 +270,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_matching_bid_should_create_four_executions() throws InterruptedException {
+    public void add_matching_bid_should_create_four_executions() throws InterruptedException, ValidationException {
 
         String productId = "XSS";
 
@@ -310,7 +313,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_matching_ask_to_order_book_should_result_in_removing_first_bid_level_and_reducing_the_second_bidlevel_and_ask_is_fully_executed() {
+    public void add_matching_ask_to_order_book_should_result_in_removing_first_bid_level_and_reducing_the_second_bidlevel_and_ask_is_fully_executed() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03, 100.01, 100.34, 100.03);
@@ -332,7 +335,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void add_matching_ask_should_create_four_executions() throws InterruptedException {
+    public void add_matching_ask_should_create_four_executions() throws InterruptedException, ValidationException {
 
         String productId = "XSS";
 
@@ -375,9 +378,8 @@ public class OrderBookTest {
         Assert.assertTrue("Top level Bid quantity is 500 ", book.getBids().getFirst().getQuantity() == 500);
     }
 
-
     @Test
-    public void ask_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
+    public void ask_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException, ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -401,9 +403,8 @@ public class OrderBookTest {
 
     }
 
-
     @Test
-    public void bid_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException {
+    public void bid_order_within_discretionary_offset_must_trigger_negotiation() throws InterruptedException, ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -427,7 +428,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void top_level_subscription_should_stream_top_level_prices_in_order_of_order_entry() throws InterruptedException {
+    public void top_level_subscription_should_stream_top_level_prices_in_order_of_order_entry() throws InterruptedException, ValidationException {
 
         OrderBook book = createOrderBook("XSS", PriceType.Cash);
 
@@ -487,8 +488,10 @@ public class OrderBookTest {
 
     }
 
-    @Test(expected = IllegalArgumentException.class)
-    public void cancel_order_should_throw_exception_when_calling_wrong_method() {
+    @Test
+    public void cancel_order_should_throw_exception_when_calling_wrong_method() throws ValidationException {
+        exception.expect(ValidationException.class);
+        exception.expectMessage("Only New orders accepted");
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -498,6 +501,7 @@ public class OrderBookTest {
         LOGGER.info("After {}", book.printOrderBook());
         Order cancelOrder = Order.newBuilder(order)
                 .setMsgType(MsgType.Cancel)
+                .setOrderId(UUID.randomUUID().toString())
                 .setPrice(order.getPrice().clear()) // Avro builder doesnt reset the buffer when copying
                 .build();
         book.addOrder(cancelOrder);
@@ -505,7 +509,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void cancel_bid_order_should_remove_bid_order_in_orderbook() {
+    public void cancel_bid_order_should_remove_bid_order_in_orderbook() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -524,9 +528,8 @@ public class OrderBookTest {
         LOGGER.info("After {}", book.printOrderBook());
     }
 
-
     @Test
-    public void cancel_ask_order_should_remove_ask_order_in_orderbook() {
+    public void cancel_ask_order_should_remove_ask_order_in_orderbook() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -546,7 +549,7 @@ public class OrderBookTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void add_existing_order_should_result_in_exception_being_thrown() {
+    public void add_existing_order_should_result_in_exception_being_thrown() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -559,7 +562,7 @@ public class OrderBookTest {
     }
 
     @Test(expected = IllegalArgumentException.class)
-    public void cancel_non_existent_order_should_result_in_exception_being_thrown() {
+    public void cancel_non_existent_order_should_result_in_exception_being_thrown() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -569,7 +572,7 @@ public class OrderBookTest {
     }
 
     @Test
-    public void amend_order_should_result_cancel_old_order_and_add_new_order() {
+    public void amend_order_should_result_cancel_old_order_and_add_new_order() throws ValidationException {
         String productId = "XSS";
         PriceType pricetype = PriceType.Cash;
         OrderBook book = createTestOrderBook(productId, createOrderBook(productId, pricetype), 99.01, 99.34, 99.03,
@@ -594,7 +597,39 @@ public class OrderBookTest {
         Mockito.verify(spyOrderBook, times(1)).addOrder(Mockito.any());
     }
 
-    private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) {
+    @Test
+    public void add_order_with_quantity_less_than_or_equal_to_zero_should_throw_exception(){
+
+    }
+    @Test
+    public void add_limit_order_with_price_less_than_or_equal_to_zero_should_throw_exception(){
+
+    }
+    @Test
+    public void amend_limit_order_with_price_less_than_or_equal_to_zero_should_throw_exception(){
+
+    }
+    @Test
+    public void amend_order_with_quantity_less_than_or_equal_to_zero_should_throw_exception(){
+
+    }
+
+    @Test
+    public void market_order_should_walk_the_orderbook_to_full_execution(){
+
+    }
+
+    @Test
+    public void market_order_should_walk_the_orderbook_for_partial_execution_and_add_to_top_level(){
+
+    }
+
+    @Test
+    public void limit_order_should_execute_existing_market_order_on_order_book(){
+
+    }
+
+    private OrderBook createTestOrderBook(String productId, OrderBook orderBook, double bid1, double bid2, double bid3, double ask1, double ask2, double ask3) throws ValidationException {
         OrderBook book = orderBook;
 
         book.addOrder(createOrder(productId, bid1, 1000, Side.Buy));

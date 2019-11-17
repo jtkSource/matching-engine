@@ -6,6 +6,10 @@ import com.jtk.matching.api.gen.Order;
 import com.jtk.matching.api.gen.enums.MsgType;
 import com.jtk.matching.api.gen.enums.PriceType;
 import com.jtk.matching.api.gen.enums.Side;
+import static com.jtk.matching.core.OrderBookValidation.validateAmendOrder;
+import static com.jtk.matching.core.OrderBookValidation.validateCancelOrder;
+import static com.jtk.matching.core.OrderBookValidation.validateNewOrder;
+import com.jtk.matching.core.exp.ValidationException;
 import org.eclipse.collections.api.list.MutableList;
 import org.eclipse.collections.api.set.sorted.MutableSortedSet;
 import org.eclipse.collections.api.tuple.Pair;
@@ -23,11 +27,9 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.logging.Level;
@@ -95,6 +97,10 @@ public class OrderBook {
         return this.priceType;
     }
 
+    public static int getPriceScale() {
+        return PRICE_SCALE;
+    }
+
     /**
      * Subscribing to the FluxProcessor returned by this method will tap into orders that fall within a configured
      * discretionary offset when added to the order book.
@@ -125,13 +131,10 @@ public class OrderBook {
         return executionProcessor;
     }
 
-    //TODO: validations - MKT prices to be supported
-    public void addOrder(Order order) {
-        if (order.getMsgType() != MsgType.New)
-            throw new IllegalArgumentException("Only New Order Type is accepted");
-        if(orderIdSet.contains(order.getOrderId()))
-            throw new IllegalArgumentException("OrderId "+order.getOrderId()+" is already in order-book");
-
+    public void addOrder(Order order) throws ValidationException {
+        if (orderIdSet.contains(order.getOrderId()))
+            throw new IllegalArgumentException("OrderId " + order.getOrderId() + " is already in order-book");
+        validateNewOrder(order);
         OrderBookEntry orderEntry =
                 new OrderBookEntry(order.getOrderId(),
                         convertToBigDecimal(order.getPrice(), PRICE_SCALE),
@@ -152,12 +155,11 @@ public class OrderBook {
                 .subscribe(negoProcessor::onNext);
     }
 
-    public boolean cancelOrder(Order cancelOrder) {
+    public boolean cancelOrder(Order cancelOrder) throws ValidationException {
         boolean isCancelled;
-        if (cancelOrder.getMsgType() != MsgType.Cancel)
-            throw new IllegalArgumentException("Only Cancel Message Type is accepted");
-        if(!orderIdSet.contains(cancelOrder.getOrderId()))
-            throw new IllegalArgumentException("OrderId "+cancelOrder.getOrderId()+" is doesnt exist in order-book");
+        if (!orderIdSet.contains(cancelOrder.getOrderId()))
+            throw new IllegalArgumentException("OrderId " + cancelOrder.getOrderId() + " is doesnt exist in order-book");
+        validateCancelOrder(cancelOrder);
 
         if (cancelOrder.getSide() == Side.Sell) {
             try {
@@ -181,19 +183,17 @@ public class OrderBook {
         return isCancelled;
     }
 
-
-    public boolean amendOrder(Order amendOrder) {
-        if(amendOrder.getMsgType() != MsgType.Amend){
-            throw new IllegalArgumentException("Only amend orders accepted");
-        }
-        if(cancelOrder(Order.newBuilder(amendOrder).setMsgType(MsgType.Cancel).build())){
+    public boolean amendOrder(Order amendOrder) throws ValidationException {
+        validateAmendOrder(amendOrder);
+        if (cancelOrder(Order.newBuilder(amendOrder).setMsgType(MsgType.Cancel).build())) {
             Order newOrder = Order.newBuilder(amendOrder).setMsgType(MsgType.New).build();
             addOrder(newOrder);
             return Boolean.TRUE;
-        }else {
+        } else {
             return Boolean.FALSE;
         }
     }
+
 
     public BigDecimal getBestAsk() {
         return bestAsk.get();
