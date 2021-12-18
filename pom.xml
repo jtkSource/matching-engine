@@ -18,7 +18,7 @@
         <maven.compiler.target>11</maven.compiler.target>
         <avro.version>1.9.1</avro.version>
         <slf4jVersion>1.7.28</slf4jVersion>
-        <log4j2.version>2.13.3</log4j2.version>
+        <log4j2.version>2.17.0</log4j2.version>
     </properties>
 
     <build>
